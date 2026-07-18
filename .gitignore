@@ -1,2 +1,7 @@
 *:Zone.Identifier
 CLAUDE.md
+node_modules/
+dist/
+coverage/
+*.log
+.idea/
