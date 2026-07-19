@@ -11,13 +11,16 @@ import { step, Action } from '../core/step.js';
  * állásba. A keresés szimulációval (`step()`) történik zárt homokozó-
  * pályákon, ezért a fizika bit-pontosan ugyanaz, mint a valódi játékban.
  *
- * Eltérés a v2 spec pontos aláírásától: egy kulcshoz TÖBB jelöltet is
- * tárolunk (séta/lelépés ÉS ugrás), költség szerint növekvő sorrendben.
- * Erre azért van szükség, mert egy sík `dRow = 0` él lehet sétaél
- * (folytonos talajon) VAGY lyukat átugró él (szakadék felett) — a
- * `JumpGraph` a valódi pályán validálva választja ki az elsőt, amelyik
- * ténylegesen kivitelezhető. A landolás mindig SZÉLES felületre történik,
- * hogy Mario meg tudjon állni rajta (1 cellás csempéről lecsúszna).
+ * Eltérés a v2 spec pontos aláírásától: egy kulcshoz TÖBB, KÜLÖNBÖZŐ
+ * röppályájú jelöltet tárolunk (séta/lelépés ÉS többféle ugrás-ív),
+ * költség szerint növekvő sorrendben. Erre azért van szükség, mert egy adott
+ * `(dRow, dCol)` elmozdulás sokféle akciósorral kivitelezhető (más-más
+ * vízszintes időzítéssel → más-más ív), és a valódi pályán az egyik ívet a
+ * terep blokkolhatja, míg egy másik szabadon átér. A `JumpGraph` a jelölteket
+ * sorban validálja, és a legolcsó KIVITELEZHETŐT választja — ha csak egy
+ * jelölt lenne, egy blokkolt ív miatt kimaradna egy egyébként végrehajtható
+ * él (M3-audit K2 hiba). A landolás mindig SZÉLES felületre történik, hogy
+ * Mario meg tudjon állni rajta (1 cellás csempéről lecsúszna).
  */
 
 // A tartomány a spec 5.2 szerint: dRow ∈ [-5, +8], dCol ∈ [1, 7].
@@ -35,6 +38,9 @@ const SR = 30; // kiindulási állás sora
 const SC = 8; // kiindulási állás oszlopa
 const SANDBOX_WIDTH = SC + JUMP_TABLE_RANGE.maxDCol + 12;
 const MAX_MANEUVER_TICKS = 64;
+// Kulcsonként ennyi (legolcsóbb) jelöltet tartunk meg — elég ahhoz, hogy a
+// blokkolt ívekre legyen tartalék, de a JumpGraph építését ne lassítsa el.
+const MAX_CANDIDATES_PER_KEY = 12;
 
 /** @param {number} dRow @param {number} dCol @returns {string} */
 export function jumpTableKey(dRow, dCol) {
@@ -152,16 +158,28 @@ export function buildJumpTable() {
   /** @type {Map<string, {actions: Uint8Array, ticks: number}[]>} */
   const entries = new Map();
 
-  /** cheapest[kind][dCol] → {actions, ticks} egy adott dRow-ra */
-  const collect = (level, maneuvers, expectedRow, best) => {
+  /**
+   * Minden landolást összegyűjt: dCol → jelöltek listája. Egy adott dCol-hoz
+   * MINDEN különböző akciósorozatot megtart (más akciósor = más ív = más
+   * terepátjárhatóság). A csonkolt akciósorozat a dedup-kulcs, így a
+   * settle utáni NONE-kifutásban különböző, de valójában azonos mozdulatok
+   * nem duplikálódnak.
+   * @param {Level} level @param {number[][]} maneuvers @param {number} expectedRow
+   * @param {Map<number, {actions: Uint8Array, ticks: number}[]>} best
+   * @param {Set<string>} seen - dCol-hatókörű aláírások (duplikátumszűrés)
+   */
+  const collect = (level, maneuvers, expectedRow, best, seen) => {
     for (const actions of maneuvers) {
       const hit = firstSettled(level, actions, expectedRow);
       if (!hit) continue;
       if (hit.dCol < JUMP_TABLE_RANGE.minDCol || hit.dCol > JUMP_TABLE_RANGE.maxDCol) continue;
-      const prev = best.get(hit.dCol);
-      if (!prev || hit.ticks < prev.ticks) {
-        best.set(hit.dCol, { actions: Uint8Array.from(actions.slice(0, hit.ticks)), ticks: hit.ticks });
-      }
+      const truncated = Array.from(actions.slice(0, hit.ticks));
+      const signature = `${hit.dCol}:${truncated.join('')}`;
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      const list = best.get(hit.dCol) ?? [];
+      list.push({ actions: Uint8Array.from(truncated), ticks: hit.ticks });
+      best.set(hit.dCol, list);
     }
   };
 
@@ -172,31 +190,29 @@ export function buildJumpTable() {
     const expectedRow = SR + dRow;
     if (expectedRow < 1 || expectedRow >= SANDBOX_HEIGHT - 1) continue;
 
-    /** @type {Map<number, {actions: Uint8Array, ticks: number}>} */
-    const walkBest = new Map();
-    /** @type {Map<number, {actions: Uint8Array, ticks: number}>} */
-    const jumpBest = new Map();
+    /** @type {Map<number, {actions: Uint8Array, ticks: number}[]>} */
+    const best = new Map();
+    /** @type {Set<string>} */
+    const seen = new Set();
 
     if (dRow === 0) {
-      collect(flatFloorSandbox(), walks, expectedRow, walkBest);
+      collect(flatFloorSandbox(), walks, expectedRow, best, seen);
       for (let gap = 1; gap <= JUMP_TABLE_RANGE.maxDCol; gap += 1) {
-        collect(gapSandbox(gap), jumps, expectedRow, jumpBest);
+        collect(gapSandbox(gap), jumps, expectedRow, best, seen);
       }
     } else {
       const sandbox = stepSandbox(dRow);
-      collect(sandbox, jumps, expectedRow, jumpBest);
-      if (dRow > 0) collect(sandbox, walks, expectedRow, walkBest); // lelépés a peremről
+      collect(sandbox, jumps, expectedRow, best, seen);
+      if (dRow > 0) collect(sandbox, walks, expectedRow, best, seen); // lelépés a peremről
     }
 
     for (let dCol = JUMP_TABLE_RANGE.minDCol; dCol <= JUMP_TABLE_RANGE.maxDCol; dCol += 1) {
-      const list = [];
-      const w = walkBest.get(dCol);
-      const j = jumpBest.get(dCol);
-      if (w) list.push(w);
-      if (j) list.push(j);
-      if (list.length > 0) {
-        list.sort((a, b) => a.ticks - b.ticks);
-        entries.set(jumpTableKey(dRow, dCol), list);
+      const list = best.get(dCol);
+      if (list && list.length > 0) {
+        // Legolcsóbb elöl; azonos költségnél a rövidebb akciósor előbb —
+        // a JumpGraph a legolcsóbb kivitelezhetőt választja a listából.
+        list.sort((a, b) => a.ticks - b.ticks || a.actions.length - b.actions.length);
+        entries.set(jumpTableKey(dRow, dCol), list.slice(0, MAX_CANDIDATES_PER_KEY));
       }
     }
   }
