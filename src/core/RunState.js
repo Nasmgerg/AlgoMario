@@ -35,6 +35,17 @@ export const RunStatus = Object.freeze({
  */
 export function createInitialRunState(level) {
   const { row, col } = level.startPosition;
+  return createRunStateAt(row, col);
+}
+
+/**
+ * Nyugalmi (kanonikus) futásállapot egy adott cellán: talajon áll, nincs
+ * sebessége. Az AI-réteg ezt használja egy JumpGraph-csomópont belépő
+ * állapotaként az él-szimulációhoz és a terv végrehajtásához.
+ * @param {number} row @param {number} col
+ * @returns {RunState}
+ */
+export function createRunStateAt(row, col) {
   return Object.freeze({
     row,
     col,
