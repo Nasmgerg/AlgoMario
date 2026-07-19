@@ -5,15 +5,15 @@ import { step } from '../core/step.js';
  * PlanExecutor — a keresés eredményét (csomópontok + élek) tick-szintű
  * akciófolyammá alakítja és lejátssza (SPEC.md 7).
  *
- * A JumpGraph élei kanonikus (nyugalmi, egész oszlopú) csomópont-állapotból
- * vannak validálva. A hű lejátszás ezért csomópontonként ÚJRAHORGONYOZ: az
- * él akcióit mindig a forrás-csomópont kanonikus állapotából futtatja. Így
- * minden él bizonyítottan a cél-csomópontba érkezik (ezt a
- * konzisztencia-ellenőrzés ki is mondja), és a hibák nem halmozódnak.
- *
- * A folytonos (összefűzött) lejátszás — ahol a sebesség a csomóponthatárokon
- * átvezet — az él-menü nyugalmi kanonizálása miatt sodródhat; ezt a
- * `measureContinuousDrift` méri, és M4+-ban finomítható.
+ * A JumpGraph minden éle a forrás-csomópont kanonikus (nyugalmi, egész
+ * oszlopú) állapotából indul, ÉS PONTOSAN a cél-csomópont ugyanilyen
+ * kanonikus állapotában végződik (a JumpGraph horgony-fázisa gondoskodik
+ * erről). Ezért az élek FOLYTONOSAN komponálhatók: a `runContinuous` az
+ * összefűzött akciófolyamot egyetlen, megszakítás nélküli `step()`-láncként
+ * futtatja a start-állapotból, ÚJRAHORGONYZÁS NÉLKÜL — és a tervezett
+ * csomópontoktól való eltérés csak lebegőpontos hiba nagyságrendű (M3-audit
+ * K1 javítva). A `runReanchored` (élenkénti kanonikus újraindítás) így már
+ * csak diagnosztika: az eredménye bit-azonos a folytonossal.
  */
 export class PlanExecutor {
   /**
@@ -86,26 +86,51 @@ export class PlanExecutor {
   }
 
   /**
-   * Folytonos lejátszás sodródásmérése: az összefűzött akciófolyamot a pálya
-   * valódi startjáról futtatja, és élhatáronként összeveti a tényleges
-   * oszlopot a tervezettel.
+   * VALÓDI folytonos lejátszás: a start-csomópont állapotából egyetlen,
+   * megszakítás nélküli `step()`-láncként futtatja az ÖSSZES él akcióját
+   * (újrahorgonyzás NÉLKÜL), és élhatáronként méri a tervezettől való
+   * eltérést (SPEC.md 7 konzisztencia-ellenőrzés). Ez az M4 lejátszás-
+   * vizualizáció és az M5 race/realtime alapja.
+   *
    * @param {number[]} path @param {import('./JumpGraph.js').JumpEdge[]} edges
-   * @returns {{maxDrift: number, finalStatus: string}}
+   * @returns {{ok: boolean, reachedGoal: boolean, maxDrift: number, ticks: number, trajectory: {row:number,col:number}[], failedEdge: number}}
    */
-  measureContinuousDrift(path, edges) {
+  runContinuous(path, edges) {
     const nodes = this.graph.nodes;
     const startNode = nodes[path[0]];
+    const goalNode = nodes[path[path.length - 1]];
     let state = createRunStateAt(startNode.row, startNode.col);
+    /** @type {{row:number,col:number}[]} */
+    const trajectory = [{ row: state.row, col: state.col }];
     let maxDrift = 0;
+    let ticks = 0;
 
     for (let i = 0; i < edges.length; i += 1) {
       for (const action of edges[i].actions) {
         state = step(state, action, this.physicsLevel);
-        if (state.status === RunStatus.FELL) return { maxDrift: Infinity, finalStatus: state.status };
+        trajectory.push({ row: state.row, col: state.col });
+        ticks += 1;
+        if (state.status === RunStatus.FELL) {
+          return { ok: false, reachedGoal: false, maxDrift: Infinity, ticks, trajectory, failedEdge: i };
+        }
       }
       const planned = nodes[path[i + 1]];
       maxDrift = Math.max(maxDrift, Math.abs(state.col - planned.col), Math.abs(state.row - planned.row));
     }
-    return { maxDrift, finalStatus: state.status };
+
+    const reachedGoal =
+      state.grounded && state.row === goalNode.row && Math.abs(state.col - goalNode.col) < 1e-6;
+    return { ok: reachedGoal, reachedGoal, maxDrift, ticks, trajectory, failedEdge: -1 };
+  }
+
+  /**
+   * Folytonos lejátszás sodródásmérése (kompatibilitási vékony wrapper a
+   * {@link runContinuous} köré).
+   * @param {number[]} path @param {import('./JumpGraph.js').JumpEdge[]} edges
+   * @returns {{maxDrift: number, finalStatus: string}}
+   */
+  measureContinuousDrift(path, edges) {
+    const result = this.runContinuous(path, edges);
+    return { maxDrift: result.maxDrift, finalStatus: result.reachedGoal ? RunStatus.GOAL : RunStatus.FELL };
   }
 }

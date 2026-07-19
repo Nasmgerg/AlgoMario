@@ -1,6 +1,6 @@
 import { Level, CellType, isSolidCellType } from '../world/Level.js';
 import { createRunStateAt, RunStatus } from '../core/RunState.js';
-import { step } from '../core/step.js';
+import { step, Action } from '../core/step.js';
 import { buildJumpTable, jumpTableKey } from './JumpTable.js';
 
 /**
@@ -74,12 +74,58 @@ function collectNodes(level) {
   return nodes;
 }
 
+// A cél-oszlopra állás megengedett float-hibája. A horgony-fázis PONTOSAN
+// egész oszlopra visz (a fizika 0,05 rácson mozog), ez csak a 0,05 tört
+// bináris reprezentációjának hibáját nyeli el.
+const ANCHOR_EPS = 1e-6;
+const POS_UNIT = 0.05; // a fizika kvantuma: minden Δpozíció 0,05 többszöröse
+const MAX_ALIGN_TICKS = 24;
+
 /**
- * Egy JumpTable-jelölt kivitelezhető-e a valódi pályán A-ból B-be: a
- * kanonikus (nyugalmi) A-állapotból lefuttatjuk az akciókat, és Mariónak
- * pontosan B-ben, nyugalomban kell megállnia.
+ * "Horgony"-fázis a VALÓDI terepen: a landolási (tört oszlopú) nyugalmi
+ * állapotból a legrövidebb akciósor, ami PONTOSAN a `targetCol` egész
+ * oszlopra, `vCol = 0` nyugalomba viszi Mariót, VÉGIG ugyanazon a soron,
+ * a valódi pálya peremeit/falait tiszteletben tartva. Ez teszi az éleket
+ * folytonosan komponálhatóvá: minden él pontosan a cél-csomópont kanonikus
+ * állapotában végződik, így a következő él pontosan onnan indul — nincs
+ * halmozódó sodródás (M3-audit K1). BFS a `(col, vCol)` 0,05-rácson,
+ * determinisztikus. `null`, ha a terep miatt nem horgonyozható.
+ * @param {Level} level @param {import('../core/RunState.js').RunState} start @param {number} targetCol
+ * @returns {number[] | null}
+ */
+function alignToInteger(level, start, targetCol) {
+  const keyOf = (s) => `${Math.round(s.col / POS_UNIT)},${Math.round(s.vCol / POS_UNIT)}`;
+  const atAnchor = (s) => s.grounded && s.vCol === 0 && Math.abs(s.col - targetCol) < ANCHOR_EPS;
+  if (atAnchor(start)) return [];
+
+  const queue = [{ state: start, actions: /** @type {number[]} */ ([]) }];
+  const seen = new Set([keyOf(start)]);
+  while (queue.length > 0) {
+    const { state, actions } = queue.shift();
+    if (actions.length >= MAX_ALIGN_TICKS) continue;
+    for (const a of [Action.LEFT, Action.RIGHT, Action.NONE]) {
+      const next = step(state, a, level);
+      if (next.status !== RunStatus.RUNNING || !next.grounded || next.row !== start.row) continue;
+      const key = keyOf(next);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const nextActions = [...actions, a];
+      if (atAnchor(next)) return nextActions;
+      queue.push({ state: next, actions: nextActions });
+    }
+  }
+  return null;
+}
+
+/**
+ * Egy JumpTable-jelölt kivitelezhető-e a valódi pályán A-ból B-be. A
+ * kanonikus (nyugalmi) A-állapotból lefuttatjuk a fő-manővert; ha Mario B
+ * cellájában, nyugalomban (de tört oszlopon) áll meg, a VALÓDI terepen
+ * hozzáfűzünk egy horgony-fázist, ami PONTOSAN B egész oszlopára állítja.
+ * Az így visszaadott, teljes akciósor B kanonikus állapotában végződik →
+ * folytonosan komponálható a következő éllel.
  * @param {Level} physics @param {JumpNode} from @param {JumpNode} to @param {Uint8Array} actions
- * @returns {{cost: number, coins: number[]} | null}
+ * @returns {{cost: number, coins: number[], actions: Uint8Array} | null}
  */
 function validateEdge(physics, from, to, actions) {
   let state = createRunStateAt(from.row, from.col);
@@ -87,10 +133,24 @@ function validateEdge(physics, from, to, actions) {
     state = step(state, actions[t], physics);
     if (state.status !== RunStatus.RUNNING) return null;
   }
-  const arrived =
-    state.grounded && state.vCol === 0 && state.row === to.row && Math.round(state.col) === to.col;
-  if (!arrived) return null;
-  return { cost: actions.length, coins: [...state.collectedCoins] };
+  // Fő-fázis: B cellájában, nyugalomban (round az egész oszlopra).
+  if (!(state.grounded && state.vCol === 0 && state.row === to.row && Math.round(state.col) === to.col)) {
+    return null;
+  }
+  // Horgony-fázis a valódi terepen: pontosan az egész oszlopra.
+  const align = alignToInteger(physics, state, to.col);
+  if (align === null) return null;
+  for (const a of align) {
+    state = step(state, a, physics);
+    if (state.status !== RunStatus.RUNNING) return null;
+  }
+  if (!(state.grounded && state.vCol === 0 && state.row === to.row && Math.abs(state.col - to.col) < ANCHOR_EPS)) {
+    return null;
+  }
+  const full = new Uint8Array(actions.length + align.length);
+  full.set(actions, 0);
+  full.set(align, actions.length);
+  return { cost: full.length, coins: [...state.collectedCoins], actions: full };
 }
 
 /** A makró-gráf (SPEC.md 5.3). */
@@ -167,7 +227,7 @@ export function buildJumpGraph(level) {
           edges[from.index].push({
             to: toIndex,
             cost: result.cost,
-            actions: candidate.actions,
+            actions: result.actions, // fő-manőver + a terepen tuningolt horgony
             coins: result.coins,
           });
           break; // a legolcsóbb kivitelezhető jelölt nyer (a lista rendezett)

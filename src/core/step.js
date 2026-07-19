@@ -13,6 +13,21 @@ export const Action = Object.freeze({
 
 const COLLISION_EPS = 1e-9;
 
+// A fizika pozíció-kvantuma: MINDEN sebesség, gyorsulás és súrlódás a 0,05
+// többszöröse (JUMP 0.70, GRAVITY 0.05, RUN_ACCEL/FRICTION 0.15, MAX_RUN 0.20,
+// MAX_FALL 2.00), ezért a pozíció is mindig 0,05-rácson mozog. A lebegőpontos
+// összeadás azonban ~1e-14 zajt hoz be, ami PONTOSAN egy cellahatáron
+// (pl. col = 34,0) átbillentheti a `Math.floor`-t → hibás ütközés-döntés.
+// A `snapToGrid` a zajt levágja: a döntések így bit-pontosan reprodukálhatók,
+// és egy terv folytonosan (újrahorgonyzás nélkül) is a validálttal azonosan
+// fut le (M3-audit K1). SPEC.md D8 (determinizmus) szempontjából is nyereség.
+const POS_GRID = 20; // 1 / 0.05
+
+/** @param {number} x @returns {number} a 0,05-rácsra kerekített érték */
+function snapToGrid(x) {
+  return Math.round(x * POS_GRID) / POS_GRID;
+}
+
 /** @param {number} value @param {number} min @param {number} max */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -21,13 +36,15 @@ function clamp(value, min, max) {
 /**
  * Az `[pos, pos+1)` intervallum által érintett egész cellaindexek (1 vagy 2,
  * a törtrész-illeszkedéstől függően — Mario doboza pontosan 1 cella méretű).
+ * A `pos`-t a 0,05-rácson, egész egységekben értékeljük ki, így a döntés
+ * float-zaj-immun a cellahatárokon.
  * @param {number} pos
  * @returns {number[]}
  */
 function overlappedCells(pos) {
-  const lo = Math.floor(pos);
-  const hi = Math.floor(pos + 1 - COLLISION_EPS);
-  return hi > lo ? [lo, hi] : [lo];
+  const units = Math.round(pos * POS_GRID);
+  const lo = Math.floor(units / POS_GRID);
+  return units % POS_GRID === 0 ? [lo] : [lo, lo + 1];
 }
 
 /**
@@ -64,7 +81,7 @@ function effectiveCellType(level, state, row, col) {
  * @param {number} vCol
  */
 function moveHorizontal(level, state, vCol) {
-  let col = state.col + vCol;
+  let col = snapToGrid(state.col + vCol);
   if (vCol !== 0) {
     const rows = overlappedCells(state.row);
     const leadingCol = vCol > 0 ? Math.floor(col + 1 - COLLISION_EPS) : Math.floor(col);
@@ -86,7 +103,7 @@ function moveHorizontal(level, state, vCol) {
  * @param {number} vRow
  */
 function moveVertical(level, state, col, vRow) {
-  let row = state.row + vRow;
+  let row = snapToGrid(state.row + vRow);
   let grounded = false;
   let poppedSurprises = state.poppedSurprises;
   let scoreDelta = 0;
@@ -217,8 +234,8 @@ export function step(state, action, level) {
   return Object.freeze({
     row: vertical.row,
     col: horizontal.col,
-    vRow: vertical.vRow,
-    vCol: horizontal.vCol,
+    vRow: snapToGrid(vertical.vRow),
+    vCol: snapToGrid(horizontal.vCol),
     grounded: vertical.grounded,
     ticks,
     score: state.score + progressScore + coinResult.scoreDelta + vertical.scoreDelta + goalBonus,

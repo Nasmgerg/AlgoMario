@@ -177,6 +177,10 @@ export function buildJumpTable() {
       const signature = `${hit.dCol}:${truncated.join('')}`;
       if (seen.has(signature)) continue;
       seen.add(signature);
+      // Csak a fő-manővert tároljuk. A cél-oszlopra pontosan állító
+      // "horgony"-fázist a JumpGraph fűzi hozzá, a VALÓDI terepen tuningolva
+      // (a homokozó széles padlóján tuningolt horgony egy valódi perem/lépcső
+      // mellett elcsúszna — ezért nem itt, hanem élenként, a helyszínen).
       const list = best.get(hit.dCol) ?? [];
       list.push({ actions: Uint8Array.from(truncated), ticks: hit.ticks });
       best.set(hit.dCol, list);
