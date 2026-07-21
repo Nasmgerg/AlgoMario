@@ -2,26 +2,7 @@ import { Level, CellType } from '../world/Level.js';
 import { createRunStateAt, RunStatus } from '../core/RunState.js';
 import { step, Action } from '../core/step.js';
 
-/**
- * JumpTable — előszámított "mozdulat-menü" (SPEC.md 5.2).
- *
- * Minden `(dRow, dCol)` eltolásra megkeressük, milyen akciósorozattal és
- * hány tick alatt jut Mario egy nyugalmi (talajon álló, sebesség nélküli)
- * kiindulásból egy `dRow` sorral és `dCol` oszloppal odébb lévő nyugalmi
- * állásba. A keresés szimulációval (`step()`) történik zárt homokozó-
- * pályákon, ezért a fizika bit-pontosan ugyanaz, mint a valódi játékban.
- *
- * Eltérés a v2 spec pontos aláírásától: egy kulcshoz TÖBB, KÜLÖNBÖZŐ
- * röppályájú jelöltet tárolunk (séta/lelépés ÉS többféle ugrás-ív),
- * költség szerint növekvő sorrendben. Erre azért van szükség, mert egy adott
- * `(dRow, dCol)` elmozdulás sokféle akciósorral kivitelezhető (más-más
- * vízszintes időzítéssel → más-más ív), és a valódi pályán az egyik ívet a
- * terep blokkolhatja, míg egy másik szabadon átér. A `JumpGraph` a jelölteket
- * sorban validálja, és a legolcsó KIVITELEZHETŐT választja — ha csak egy
- * jelölt lenne, egy blokkolt ív miatt kimaradna egy egyébként végrehajtható
- * él (M3-audit K2 hiba). A landolás mindig SZÉLES felületre történik, hogy
- * Mario meg tudjon állni rajta (1 cellás csempéről lecsúszna).
- */
+/** JumpTable — előszámított mozdulat-menü, kulcsonként több röppálya-jelölttel: egy blokkoltat másik időzítés kiválthat (SPEC.md 5.2, M3-audit K2). */
 
 // A tartomány a spec 5.2 szerint: dRow ∈ [-5, +8], dCol ∈ [1, 7].
 export const JUMP_TABLE_RANGE = /** @type {{minDRow:number,maxDRow:number,minDCol:number,maxDCol:number}} */ (
@@ -94,10 +75,7 @@ function stepSandbox(dRow) {
   return makeSandbox(solids);
 }
 
-/**
- * Lefuttat egy akciósorozatot, és visszaadja az ELSŐ nyugalmi (talajon,
- * `vCol === 0`) állapotot a várt sorban, `dCol >= 1` eltolással. `null`, ha
- * Mario leesik, vagy a start mögött/előtt ragad.
+/** Lefuttatja az akciósort, visszaadja az első nyugalmi állapotot a várt sorban `dCol ≥ 1` eltolással, vagy `null`-t.
  * @param {Level} level @param {number[]} actions @param {number} expectedRow
  * @returns {{dCol: number, ticks: number} | null}
  */
@@ -158,12 +136,7 @@ export function buildJumpTable() {
   /** @type {Map<string, {actions: Uint8Array, ticks: number}[]>} */
   const entries = new Map();
 
-  /**
-   * Minden landolást összegyűjt: dCol → jelöltek listája. Egy adott dCol-hoz
-   * MINDEN különböző akciósorozatot megtart (más akciósor = más ív = más
-   * terepátjárhatóság). A csonkolt akciósorozat a dedup-kulcs, így a
-   * settle utáni NONE-kifutásban különböző, de valójában azonos mozdulatok
-   * nem duplikálódnak.
+  /** dCol → jelöltlista; a csonkolt akciósor a dedup-kulcs, hogy az azonos mozdulatok ne duplikálódjanak.
    * @param {Level} level @param {number[][]} maneuvers @param {number} expectedRow
    * @param {Map<number, {actions: Uint8Array, ticks: number}[]>} best
    * @param {Set<string>} seen - dCol-hatókörű aláírások (duplikátumszűrés)
@@ -177,10 +150,7 @@ export function buildJumpTable() {
       const signature = `${hit.dCol}:${truncated.join('')}`;
       if (seen.has(signature)) continue;
       seen.add(signature);
-      // Csak a fő-manővert tároljuk. A cél-oszlopra pontosan állító
-      // "horgony"-fázist a JumpGraph fűzi hozzá, a VALÓDI terepen tuningolva
-      // (a homokozó széles padlóján tuningolt horgony egy valódi perem/lépcső
-      // mellett elcsúszna — ezért nem itt, hanem élenként, a helyszínen).
+      // Csak a fő-manőver: a horgony-fázist a JumpGraph fűzi hozzá, a valódi terepen tuningolva.
       const list = best.get(hit.dCol) ?? [];
       list.push({ actions: Uint8Array.from(truncated), ticks: hit.ticks });
       best.set(hit.dCol, list);

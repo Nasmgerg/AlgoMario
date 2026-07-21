@@ -9,12 +9,7 @@ export const RunStatus = Object.freeze({
 });
 
 /**
- * Futásállapot. A `step()` mindig ÚJ RunState-et ad vissza, nem mutálja a
- * bemenetet — a mezők ezért csak konvencionálisan, nem ténylegesen
- * immutable-ök: `collectedCoins`/`poppedSurprises` `Set`-jét soha nem
- * szabad `.add()`-olni a meglévő állapoton, mindig másolatot kell
- * készíteni (`new Set(state.collectedCoins)`), mielőtt bővítjük.
- *
+ * Futásállapot; a `collectedCoins`/`poppedSurprises` Set-jét soha nem szabad `.add()`-olni, mindig másolni kell bővítés előtt.
  * @typedef {object} RunState
  * @property {number} row - Mario doboz bal-felső sarkának sora (lefelé nő)
  * @property {number} col - Mario doboz bal-felső sarkának oszlopa
@@ -39,9 +34,7 @@ export function createInitialRunState(level) {
 }
 
 /**
- * Nyugalmi (kanonikus) futásállapot egy adott cellán: talajon áll, nincs
- * sebessége. Az AI-réteg ezt használja egy JumpGraph-csomópont belépő
- * állapotaként az él-szimulációhoz és a terv végrehajtásához.
+ * Nyugalmi (kanonikus) futásállapot egy cellán — az AI-réteg ezt használja csomópont-állapotként.
  * @param {number} row @param {number} col
  * @returns {RunState}
  */

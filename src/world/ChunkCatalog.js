@@ -76,12 +76,7 @@ function buildStairs(ctx) {
   const stepWidth = rng.nextInt(1, 3);
   const baseline = groundTopRow(ctx);
   const lastStepIndex = Math.floor((width - 1) / stepWidth);
-  // A teljes emelkedés/ereszkedés a chunkon belül korlátozott (fennsíkban
-  // végződik hosszú lépcsőnél), hogy a chunk mindkét vége a szomszédos
-  // chunkok alap (baseline) magasságához képest a JumpTable dokumentált
-  // tartományán (SPEC.md 5.2: dRow ∈ [-5, +8]) belül maradjon — a chunkok
-  // nem ismerik egymás geometriáját, ezért ezt itt, a forrásnál kell
-  // biztosítani, nem utólagos javítással.
+  // Az emelkedés korlátozott (fennsíkban végződik), hogy a chunk vége a szomszédos chunk baseline-jához képest a JumpTable tartományán belül maradjon (SPEC.md 5.2).
   const maxSteps = 4;
   for (let localCol = 0; localCol < width; localCol += 1) {
     const stepIndex = Math.floor(localCol / stepWidth);
@@ -164,12 +159,7 @@ function buildGapPlatform(ctx) {
   }
 }
 
-/**
- * A nyolc chunk-típus (SPEC.md 4.2. szakasz táblázata). `category` a
- * `LevelGenerator` súlyozásához: `gapFrequency`/`platformDensity`/
- * `coinDensity` paraméterek ezekre a kategóriákra hatnak, a `flat`
- * kategória mindig alap súllyal szerepel (változatosság).
- */
+/** A nyolc chunk-típus (SPEC.md 4.2); `category` a LevelGenerator súlyozásához (gapFrequency/platformDensity/coinDensity). */
 export const CHUNK_TYPES = Object.freeze([
   Object.freeze({ type: 'flat', minDifficulty: 0, minWidth: 4, maxWidth: 8, category: 'flat', build: buildFlat }),
   Object.freeze({ type: 'gap', minDifficulty: 1, minWidth: 4, maxWidth: 8, category: 'gap', build: buildGap }),

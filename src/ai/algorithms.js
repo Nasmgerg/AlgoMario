@@ -1,7 +1,5 @@
 /**
- * A hat útkereső egyetlen közös vázon (SPEC.md 6.2). Mindegyik egy
- * "stratégia": frontier + prioritásfüggvény + dedup-politika. Így a hat
- * algoritmus garantáltan ugyanazt a kódutat járja — az összehasonlítás fair.
+ * A hat útkereső ugyanazon a vázon: frontier + prioritásfüggvény + dedup-politika (SPEC.md 6.2).
  *
  * | Algoritmus | Frontier | Prioritás | Dedup |
  * |---|---|---|---|

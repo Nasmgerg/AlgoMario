@@ -30,10 +30,7 @@ export function preloadSprites(scene) {
   scene.load.image('marioLeft', marioLeftUrl);
 }
 
-/**
- * Statikus cellák (WALL/PIPE) kirajzolása és a gyűjthető cellák (COIN/
- * SURPRISE) image-referenciáinak megőrzése, hogy a futásállapot alapján
- * frissíthetők legyenek ({@link syncCollectibles}).
+/** Statikus cellák kirajzolása + a gyűjthető cellák (COIN/SURPRISE) image-referenciáinak megőrzése ({@link syncCollectibles}-hez).
  * @param {import('phaser').Scene} scene
  * @param {import('../world/Level.js').Level} level
  */
@@ -70,10 +67,8 @@ export function buildLevelSprites(scene, level) {
   return { coinSprites, surpriseSprites };
 }
 
-/**
- * A begyűjtött érmék eltűnnek, a kiütött surprise-ok WALL-nak látszó
- * textúrára váltanak — a futásállapot (nem a Level) az igazság forrása.
- * @param {import('../core/RunState.js').RunState} state
+/** A begyűjtött érmék eltűnnek, a kiütött surprise-ok WALL-textúrára váltanak; csak a halmazokat olvassa, ezért részleges állapot is elég.
+ * @param {{collectedCoins: ReadonlySet<number>, poppedSurprises: ReadonlySet<number>}} state
  * @param {{coinSprites: Map<number, import('phaser').GameObjects.Image>, surpriseSprites: Map<number, import('phaser').GameObjects.Image>}} sprites
  */
 export function syncCollectibles(state, sprites) {

@@ -1,7 +1,4 @@
-/**
- * Controller absztrakció (SPEC.md 9.3. szakasz). `HumanController`,
- * `AIController`, `ReplayController` mind ezt implementálja, hogy a Play
- * Yourself, a Watch AI/Race és a replay ugyanazon a kódúton fusson.
+/** Controller absztrakció (SPEC.md 9.3): minden vezérlő ezt implementálja, hogy egy kódúton fusson.
  * @interface
  */
 export class Controller {

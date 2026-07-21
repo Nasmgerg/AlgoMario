@@ -1,8 +1,4 @@
-/**
- * Bináris min-heap a Dijkstra / A* / Greedy / Best-First frontierhez
- * (SPEC.md 6.2). A rendezés az elemek `priority` mezője szerint történik;
- * azonos prioritásnál a beszúrási sorrend dönt, hogy a keresés
- * determinisztikus maradjon (SPEC.md D8 szellemében).
+/** Bináris min-heap a Dijkstra/A-star/Greedy/Best-First frontierhez (SPEC.md 6.2); azonos prioritásnál a beszúrási sorrend dönt (D8 determinizmus).
  * @template {{priority: number}} T
  */
 export class BinaryHeap {

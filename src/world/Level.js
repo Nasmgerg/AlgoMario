@@ -1,6 +1,4 @@
-/**
- * Cellatípusok (SPEC.md 3.1. szakasz).
- */
+/** Cellatípusok (SPEC.md 3.1. szakasz). */
 export const CellType = Object.freeze({
   EMPTY: 0,
   WALL: 1,
@@ -15,11 +13,7 @@ export function isSolidCellType(cellType) {
   return cellType === CellType.WALL || cellType === CellType.PIPE || cellType === CellType.SURPRISE;
 }
 
-/**
- * Immutable pálya (SPEC.md 3.1: "A pálya immutable a futás alatt"). A
- * begyűjtött érmék / kiütött surprise-ok NEM itt, hanem a RunState-ben
- * (Set-ekben) vannak nyilvántartva.
- */
+/** Immutable pálya (SPEC.md 3.1); a begyűjtött érmék / kiütött surprise-ok nem itt, hanem a RunState-ben (Set-ekben) vannak nyilvántartva. */
 export class Level {
   /**
    * @param {object} params

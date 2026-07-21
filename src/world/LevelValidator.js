@@ -1,16 +1,6 @@
 import { CellType, Level } from './Level.js';
 
-/**
- * Járhatósági validáció (SPEC.md 4.3. szakasz).
- *
- * Ez EGY leegyszerűsített, a `world` rétegen belül önálló közelítése annak,
- * amit majd az `ai/JumpTable.js` + `ai/JumpGraph.js` (M3) tick-pontosan
- * fog kiszámolni. A `world` réteg nem függhet az `ai` rétegtől (M1-ben
- * az még nem is létezik), ezért itt a JumpTable dokumentált tartományát
- * (SPEC.md 5.2: `dRow ∈ [-5, +8]`, `dCol ∈ [1, 7]`) használjuk közvetlenül,
- * fizikai szimuláció nélkül. Az M3-as `JumpGraph` ezt a modult ki fogja
- * váltani egy tick-pontos változatra.
- */
+/** Járhatósági validáció (SPEC.md 4.3): a `world` réteg nem függhet az `ai`-tól, ezért a JumpTable tartományát (5.2) használja közvetlenül, szimuláció nélkül. */
 
 const MIN_ROW_DELTA = -5;
 const MAX_ROW_DELTA = 8;
@@ -109,12 +99,7 @@ export function validateLevel(level) {
 }
 
 /**
- * Célzott javítás: lépőkő (WALL) beszúrása a jelenleg elért legtávolabbi
- * oszlop (`frontier`) és az utána következő legközelebbi, potenciálisan
- * járható oszlop közé (SPEC.md 4.3: "platform beszúrása a legszélesebb
- * átjárhatatlan szakaszba" — itt a legelső, útban álló szakaszra
- * egyszerűsítve, mert ez determinisztikusan konvergál és minden esetben
- * javítja az elérhetőséget a `frontier`-en túl).
+ * Célzott javítás: lépőkő beszúrása a legtávolabb elért oszlop (`frontier`) és az utána következő járható oszlop közé (SPEC.md 4.3, az első szakaszra egyszerűsítve).
  * @param {import('./Level.js').Level} level
  * @param {ValidationResult} validation
  * @returns {import('./Level.js').Level}

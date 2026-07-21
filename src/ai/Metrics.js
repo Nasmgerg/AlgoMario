@@ -1,11 +1,4 @@
-/**
- * Keresési metrikák (SPEC.md 6.4). A számlálókat a {@link import('./search.js')}
- * váz frissíti; a származtatott mutatókat (pathCost, pathLength,
- * optimalityRatio) utólag lehet kiszámolni.
- *
- * Memóriamérés szándékosan NINCS (SPEC.md D10, 6.4): a `peakOpenSize` +
- * `closedSize` pontos, determinisztikus proxy.
- */
+/** Keresési metrikák (SPEC.md 6.4); memóriamérés szándékosan nincs — a `peakOpenSize`+`closedSize` determinisztikus proxy helyette. */
 export class Metrics {
   constructor() {
     this.nodesExpanded = 0;

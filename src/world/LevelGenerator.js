@@ -184,10 +184,7 @@ function buildWithRetryChain(originalSeed, currentSeed, retryCount, genParams, m
 }
 
 /**
- * Chunk-alapú, seedelt pályagenerálás (SPEC.md 4. szakasz). Ha a generált
- * pálya 3 célzott javítás után sem járható, `seed + 1`-gyel újragenerál —
- * a determinizmus megmarad, mert a retry-lánc is a seedből származik.
- *
+ * Chunk-alapú, seedelt pályagenerálás (SPEC.md 4. szakasz); ha javítás után sem járható, `seed+1`-gyel újragenerál, megőrizve a determinizmust.
  * @param {object} options
  * @param {number} options.seed - kötelező, egész szám (a fallback véletlen
  *   seed generálása és kiírása a hívó/UI felelőssége, SPEC.md 12. szakasz)

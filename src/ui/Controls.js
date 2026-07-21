@@ -5,11 +5,7 @@ const LEFT_KEYS = ['LEFT', 'A'];
 const RIGHT_KEYS = ['RIGHT', 'D'];
 const JUMP_KEYS = ['UP', 'W', 'SPACE'];
 
-/**
- * Billentyűzetes `Controller` (SPEC.md 8.1: A/←, D/→, W/↑/Space). A Phaser
- * keyboard pluginra épül, ezért csak a `ui`/`render` rétegben élhet — a
- * `core/Controller.js` maga Phaser-mentes marad.
- */
+/** Billentyűzetes `Controller` (SPEC.md 8.1: A/←, D/→, W/↑/Space); a Phaser keyboard pluginra épül, ezért csak itt élhet, a core/ marad Phaser-mentes. */
 export class HumanController extends Controller {
   /** @param {Phaser.Input.Keyboard.KeyboardPlugin} keyboard */
   constructor(keyboard) {
@@ -22,10 +18,7 @@ export class HumanController extends Controller {
     return names.some((name) => this.keys[name]?.isDown);
   }
 
-  /**
-   * Ugrás csak talajon lévő állapotban élvez elsőbbséget (a JUMP action
-   * levegőben úgyis hatástalan a step()-ben) — így az irányváltó gombok
-   * végig hatnak repülés közben is, nem csak elrugaszkodáskor.
+  /** Ugrás csak talajon élvez elsőbbséget (levegőben a JUMP úgyis hatástalan), így az irányváltás repülés közben is működik.
    * @param {import('../core/RunState.js').RunState} state
    * @returns {number} - {@link Action}
    */

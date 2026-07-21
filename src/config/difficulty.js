@@ -15,11 +15,7 @@ export function computeMaxTicks(length) {
   return length * TICKS_PER_COLUMN;
 }
 
-/**
- * Nehézségi szint (0-4) → chunk-választási súlyok.
- * `gapFrequency`/`platformDensity`: [0,1] súly a nehezebb chunk-típusokra.
- * `coinDensity`: [0,1] súly az érme-tartalmú chunkokra.
- */
+/** Nehézségi szint (0-4) → chunk-választási súlyok ([0,1], SPEC.md 4.2). */
 export const DIFFICULTY_PRESETS = Object.freeze([
   Object.freeze({ difficulty: 0, gapFrequency: 0.0, coinDensity: 0.5, platformDensity: 0.0 }),
   Object.freeze({ difficulty: 1, gapFrequency: 0.25, coinDensity: 0.5, platformDensity: 0.15 }),

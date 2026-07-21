@@ -1,11 +1,7 @@
 import { step } from '../core/step.js';
 import { createInitialRunState, RunStatus } from '../core/RunState.js';
 
-/**
- * Play Yourself mód (SPEC.md 8.1. szakasz). Renderer-független: a
- * `render/GameScene.js` ezt hívja tick-enként, a fizika/ütközés innentől
- * teljes egészében a `core/step.js`-ből jön.
- */
+/** Play Yourself mód (SPEC.md 8.1); renderer-független, a fizikát a `core/step.js` adja tickenként. */
 export class PlayYourself {
   /**
    * @param {import('../world/Level.js').Level} level

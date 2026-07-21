@@ -13,14 +13,7 @@ export const Action = Object.freeze({
 
 const COLLISION_EPS = 1e-9;
 
-// A fizika pozíció-kvantuma: MINDEN sebesség, gyorsulás és súrlódás a 0,05
-// többszöröse (JUMP 0.70, GRAVITY 0.05, RUN_ACCEL/FRICTION 0.15, MAX_RUN 0.20,
-// MAX_FALL 2.00), ezért a pozíció is mindig 0,05-rácson mozog. A lebegőpontos
-// összeadás azonban ~1e-14 zajt hoz be, ami PONTOSAN egy cellahatáron
-// (pl. col = 34,0) átbillentheti a `Math.floor`-t → hibás ütközés-döntés.
-// A `snapToGrid` a zajt levágja: a döntések így bit-pontosan reprodukálhatók,
-// és egy terv folytonosan (újrahorgonyzás nélkül) is a validálttal azonosan
-// fut le (M3-audit K1). SPEC.md D8 (determinizmus) szempontjából is nyereség.
+// Minden sebesség/pozíció a 0,05 többszöröse; ez levágja a lebegőpontos zajt, ami cellahatáron hibás ütközés-döntést okozna (M3-audit K1).
 const POS_GRID = 20; // 1 / 0.05
 
 /** @param {number} x @returns {number} a 0,05-rácsra kerekített érték */
@@ -33,11 +26,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Az `[pos, pos+1)` intervallum által érintett egész cellaindexek (1 vagy 2,
- * a törtrész-illeszkedéstől függően — Mario doboza pontosan 1 cella méretű).
- * A `pos`-t a 0,05-rácson, egész egységekben értékeljük ki, így a döntés
- * float-zaj-immun a cellahatárokon.
+/** Az `[pos, pos+1)` által érintett cellaindexek (1 vagy 2, a törtrész-illeszkedéstől függően); a 0,05-rácson, float-zaj-immunul.
  * @param {number} pos
  * @returns {number[]}
  */
@@ -47,11 +36,7 @@ function overlappedCells(pos) {
   return units % POS_GRID === 0 ? [lo] : [lo, lo + 1];
 }
 
-/**
- * A cella tényleges (futásállapot-függő) típusa: egy kiütött surprise a
- * futásállapotban WALL-lá válik (SPEC.md 3.4), a pályán kívüli cellák a
- * pálya szélén szilárd falak, alul nyitott gödör (a "kiesés" feltétel
- * kezeli, nem az ütközés).
+/** A cella futásállapot-függő típusa: kiütött surprise WALL-lá válik (SPEC.md 3.4), pályán kívül oldalt fal, alul nyitott gödör.
  * @param {import('../world/Level.js').Level} level
  * @param {import('./RunState.js').RunState} state
  * @param {number} row @param {number} col

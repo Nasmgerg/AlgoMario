@@ -1,10 +1,4 @@
-/**
- * FIFO sor a BFS-hez (SPEC.md 6.2). Egységes frontier-interfész:
- * `push`, `pop`, `size` — a {@link import('../search.js')} váz ezt használja,
- * a prioritásmezőt figyelmen kívül hagyja.
- *
- * A `shift()` O(n) költségének elkerülésére fejmutatót használ, a lefogyott
- * elejű belső tömböt időnként tömöríti.
+/** FIFO sor a BFS-hez (SPEC.md 6.2); fejmutatót használ, hogy elkerülje a `shift()` O(n) költségét.
  * @template T
  */
 export class FifoQueue {
