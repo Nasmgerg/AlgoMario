@@ -1,22 +1,18 @@
 import { admissibleHeuristic } from './Heuristics.js';
 
-/**
- * Keresési problémák a JumpGraph fölött (SPEC.md 5.4, 6.1). A
- * {@link import('./search.js').search} által elvárt interfész:
- * `startNode()`, `isGoal(n)`, `neighbors(n)`, `heuristic(n)`.
- */
+/** Keresési problémák a JumpGraph fölött (SPEC.md 5.4, 6.1): a {@link import('./search.js').search} elvárt interfésze — `startNode()`, `isGoal(n)`, `neighbors(n)`, `heuristic(n)`. */
 
 /**
- * Speedrun mód: egyetlen cél a pálya jobb széle, költség = tick. Ebben a
- * módban az A* és a Dijkstra bizonyíthatóan optimális (SPEC.md 5.4) — ez a
- * referencia-mérték.
+ * Speedrun mód: egyetlen cél a pálya jobb széle, ebben az A* és a Dijkstra bizonyíthatóan optimális (SPEC.md 5.4).
  * @param {import('./JumpGraph.js').JumpGraph} graph
+ * @param {number} [startIndex] - kezdő csomópont, alapból a pálya startja (a collector záró szakaszához tetszőleges lehet)
  * @returns {import('./search.js').SearchProblem}
  */
-export function createSpeedrunProblem(graph) {
+export function createSpeedrunProblem(graph, startIndex = -1) {
   const goalCol = graph.level.goalColumn;
+  const start = startIndex >= 0 ? startIndex : graph.startIndex();
   return {
-    startNode: () => graph.startIndex(),
+    startNode: () => start,
     isGoal: (n) => graph.nodes[n].col >= goalCol,
     neighbors: (n) => graph.edgesFrom(n),
     heuristic: (n) => admissibleHeuristic(graph.nodes[n].col, goalCol),
@@ -41,57 +37,78 @@ export function createWaypointProblem(graph, startIndex, targetIndex) {
 }
 
 /**
- * Az érméket a leggyorsabban rájuk vezető ÉL cél-csomópontjához rendeli
- * (az él-metaadat `coins` mezője alapján). Ha egy érme egyetlen él mentén
- * sem gyűjthető be, kimarad.
- * @param {import('./JumpGraph.js').JumpGraph} graph
- * @returns {Map<number, number>} coinId → csomópont-index
+ * @typedef {Object} CollectorGate
+ * @property {number} from - a kapu-él forrás-csomópontja (ide navigál a kereső)
+ * @property {import('./JumpGraph.js').JumpEdge} edge - a kényszerített begyűjtő él
  */
-export function coinCollectionNodes(graph) {
-  /** @type {Map<number, number>} */
-  const byCoin = new Map();
+
+/** Collector "kapuk" (SPEC.md 5.4): érménként a legolcsóbb, ténylegesen begyűjtő él; a terv ide navigál, majd kényszerítetten bejárja. Oszlop szerint rendezett, nearest-neighbour sorrendű, NEM optimális.
+ * @param {import('./JumpGraph.js').JumpGraph} graph
+ * @returns {CollectorGate[]}
+ */
+export function collectorGates(graph) {
+  // Érménként az ÖSSZES hordozó él (nem csak a legolcsóbb), hogy a lánc-építés választhasson köztük.
+  /** @type {Map<number, CollectorGate[]>} */
+  const carriersByCoin = new Map();
   for (let from = 0; from < graph.nodes.length; from += 1) {
     for (const edge of graph.edgesFrom(from)) {
       for (const coinId of edge.coins) {
-        if (!byCoin.has(coinId)) byCoin.set(coinId, edge.to);
+        const list = carriersByCoin.get(coinId) ?? [];
+        list.push({ from, edge });
+        carriersByCoin.set(coinId, list);
       }
     }
   }
-  return byCoin;
+
+  // Mohó lánc-építés: mindig a kurzorból ténylegesen elérhető, legkorábbi (tie: legolcsóbb) hordozót vesszük.
+  const { canReach } = reachabilityClosure(graph);
+  const gates = [];
+  const covered = new Set();
+  let cursor = graph.startIndex();
+
+  for (;;) {
+    /** @type {CollectorGate | null} */
+    let next = null;
+    for (const [coinId, carriers] of carriersByCoin) {
+      if (covered.has(coinId)) continue;
+      for (const gate of carriers) {
+        if (!canReach(cursor, gate.from)) continue;
+        if (
+          !next ||
+          graph.nodes[gate.from].col < graph.nodes[next.from].col ||
+          (graph.nodes[gate.from].col === graph.nodes[next.from].col && gate.edge.cost < next.edge.cost)
+        ) {
+          next = gate;
+        }
+      }
+    }
+    if (!next) break;
+    gates.push(next);
+    for (const coinId of next.edge.coins) covered.add(coinId);
+    cursor = next.edge.to;
+  }
+  return gates;
 }
 
-/**
- * Collector waypoint-sorrend: start → érme₁ → … → cél, a sorrendet
- * nearest-neighbour heurisztika adja (oszloptávolság alapján). NEM optimális,
- * és ezt a UI-ban ki is írjuk (SPEC.md 5.4).
+/** Elérhetőségi lezárt bitset-ekkel; a csökkenő oszlop szerinti sorrend a jobbra irányított DAG fordított topologikus rendezése.
  * @param {import('./JumpGraph.js').JumpGraph} graph
- * @returns {number[]} csomópont-indexek: [start, ...érmecsomópontok, cél]
+ * @returns {{canReach: (from: number, to: number) => boolean}}
  */
-export function collectorWaypoints(graph) {
-  const start = graph.startIndex();
-  const goals = graph.goalIndices();
-  const goal = goals.length > 0 ? goals[0] : start;
-
-  const coinNodes = [...coinCollectionNodes(graph).values()];
-  const waypoints = [start];
-  let current = start;
-  const remaining = new Set(coinNodes);
-
-  while (remaining.size > 0) {
-    let nearest = -1;
-    let nearestDist = Infinity;
-    for (const candidate of remaining) {
-      const dist = Math.abs(graph.nodes[candidate].col - graph.nodes[current].col);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = candidate;
-      }
+function reachabilityClosure(graph) {
+  const n = graph.nodes.length;
+  const words = Math.ceil(n / 32) || 1;
+  const reach = Array.from({ length: n }, () => new Uint32Array(words));
+  const order = [...graph.nodes].sort((a, b) => b.col - a.col || b.row - a.row);
+  for (const node of order) {
+    const i = node.index;
+    const self = reach[i];
+    self[i >> 5] |= 1 << (i & 31);
+    for (const edge of graph.edgesFrom(i)) {
+      const target = reach[edge.to];
+      for (let w = 0; w < words; w += 1) self[w] |= target[w];
     }
-    waypoints.push(nearest);
-    remaining.delete(nearest);
-    current = nearest;
   }
-
-  waypoints.push(goal);
-  return waypoints;
+  return {
+    canReach: (from, to) => ((reach[from][to >> 5] >>> (to & 31)) & 1) === 1,
+  };
 }

@@ -29,6 +29,9 @@ import { BinaryHeap } from './frontiers/BinaryHeap.js';
  * @property {number} g
  * @property {number} openSize
  * @property {number} closedSize
+ * @property {ReadonlySet<number>} open   - a frontieren lévő csomópontok (ÉLŐ nézet, csak olvasandó!)
+ * @property {ReadonlySet<number>} closed - a már kiterjesztett csomópontok (ÉLŐ nézet, csak olvasandó!)
+ * @property {Metrics} metrics            - ÉLŐ számlálók (SPEC.md 6.1: a yield metrics-et is ad)
  */
 
 /** @param {Algorithm} algorithm @returns {{push: Function, pop: Function, size: number}} */
@@ -39,13 +42,10 @@ function createFrontier(algorithm) {
 }
 
 /**
- * Generátoros gráfkeresés — egyetlen váz, a viselkedést az `algorithm`
- * (frontier + prioritás + dedup) adja (SPEC.md 6.1). Minden kiterjesztésnél
- * yield-el, így időszeletelhető és lépésenként vizualizálható.
- *
+ * Generátoros gráfkeresés — egyetlen váz, a viselkedést az `algorithm` (frontier + prioritás + dedup) adja (SPEC.md 6.1).
  * @param {SearchProblem} problem
  * @param {Algorithm} algorithm
- * @param {{maxExpansions?: number, maxDepth?: number, weight?: number}} [options]
+ * @param {{maxExpansions?: number, maxDepth?: number, metrics?: Metrics}} [options] - `metrics`: megosztott számláló több futás kumulatív méréséhez
  * @returns {Generator<SearchStep, SearchResult, void>}
  */
 export function* search(problem, algorithm, options = {}) {
@@ -54,7 +54,7 @@ export function* search(problem, algorithm, options = {}) {
   const useHeap = algorithm.frontier === 'heap';
   const trackBestCost = algorithm.dedup === 'bestCost';
 
-  const metrics = new Metrics();
+  const metrics = options.metrics ?? new Metrics();
   const frontier = createFrontier(algorithm);
   const start = problem.startNode();
 
@@ -62,9 +62,15 @@ export function* search(problem, algorithm, options = {}) {
   const bestG = new Map();
   /** @type {Set<number>} nodeId (firstSeen dedup) */
   const seen = new Set();
+  // Mélységkorlátos módban a dedup mélység-tudatos, különben a rövidebb utak blokkolódnának.
+  const depthAware = algorithm.depthLimited === true;
+  /** @type {Map<number, number>} nodeId → legkisebb elérési mélység */
+  const bestDepth = new Map();
   /** @type {Map<number, {from: number, edge: import('./JumpGraph.js').JumpEdge}>} */
   const cameFrom = new Map();
   const closed = new Set();
+  // Csomópont-szintű nézet a frontierről (ami lusta törlés miatt duplikátumokat is tartalmazhat) — ezt festi "open"-ként a vizualizáció.
+  const openNodes = new Set();
 
   /** @param {number} node @param {number} g @param {number} depth */
   const makeItem = (node, g, depth) => ({
@@ -76,7 +82,9 @@ export function* search(problem, algorithm, options = {}) {
 
   bestG.set(start, 0);
   seen.add(start);
+  bestDepth.set(start, 0);
   frontier.push(makeItem(start, 0, 0));
+  openNodes.add(start);
   metrics.nodesGenerated += 1;
 
   let goalNode = start;
@@ -90,10 +98,16 @@ export function* search(problem, algorithm, options = {}) {
 
     const item = frontier.pop();
     const node = item.node;
-    if (closed.has(node)) continue;
+    if (depthAware) {
+      // Elavult (mélyebb) példány kihagyása; a sekélyebb újra kiterjeszthető.
+      if (item.depth > (bestDepth.get(node) ?? Infinity)) continue;
+    } else if (closed.has(node)) {
+      continue;
+    }
     if (trackBestCost && item.g > (bestG.get(node) ?? Infinity)) continue;
 
     closed.add(node);
+    openNodes.delete(node);
     metrics.nodesExpanded += 1;
     metrics.observeOpen(frontier.size);
 
@@ -105,7 +119,15 @@ export function* search(problem, algorithm, options = {}) {
       goalNode = node;
     }
 
-    yield { current: node, g: item.g, openSize: frontier.size, closedSize: closed.size };
+    yield {
+      current: node,
+      g: item.g,
+      openSize: frontier.size,
+      closedSize: closed.size,
+      open: openNodes,
+      closed,
+      metrics,
+    };
 
     if (problem.isGoal(node)) {
       const { path, edges } = reconstruct(cameFrom, start, node);
@@ -117,22 +139,38 @@ export function* search(problem, algorithm, options = {}) {
 
     if (item.depth >= maxDepth) continue;
 
-    for (const edge of problem.neighbors(node)) {
+    // LIFO-nál fordítva toljuk a verembe a szomszédokat, hogy tankönyvi (nem majdnem-BFS) DFS-bejárást kapjunk.
+    const neighborEdges = problem.neighbors(node);
+    const orderedEdges =
+      algorithm.frontier === 'lifo' ? [...neighborEdges].reverse() : neighborEdges;
+
+    for (const edge of orderedEdges) {
       const succ = edge.to;
-      if (closed.has(succ)) continue;
+      if (!depthAware && closed.has(succ)) continue;
       const tentativeG = item.g + edge.cost;
+      const tentativeDepth = item.depth + 1;
 
       if (trackBestCost) {
         if (tentativeG < (bestG.get(succ) ?? Infinity)) {
           bestG.set(succ, tentativeG);
           cameFrom.set(succ, { from: node, edge });
-          frontier.push(makeItem(succ, tentativeG, item.depth + 1));
+          frontier.push(makeItem(succ, tentativeG, tentativeDepth));
+          openNodes.add(succ);
+          metrics.nodesGenerated += 1;
+        }
+      } else if (depthAware) {
+        if (tentativeDepth < (bestDepth.get(succ) ?? Infinity)) {
+          bestDepth.set(succ, tentativeDepth);
+          cameFrom.set(succ, { from: node, edge });
+          frontier.push(makeItem(succ, tentativeG, tentativeDepth));
+          openNodes.add(succ);
           metrics.nodesGenerated += 1;
         }
       } else if (!seen.has(succ)) {
         seen.add(succ);
         cameFrom.set(succ, { from: node, edge });
-        frontier.push(makeItem(succ, tentativeG, item.depth + 1));
+        frontier.push(makeItem(succ, tentativeG, tentativeDepth));
+        openNodes.add(succ);
         metrics.nodesGenerated += 1;
       }
     }
@@ -164,6 +202,36 @@ function reconstruct(cameFrom, start, target) {
   path.reverse();
   edges.reverse();
   return { path, edges };
+}
+
+/**
+ * Iteratív mélyítés (SPEC.md 6.3): a mélységkorlátot 1-től növelve újrafuttatja a keresést, amíg a legkevesebb élű utat meg nem találja.
+ * @param {SearchProblem} problem
+ * @param {Algorithm} algorithm - mélységkorlátos változat (pl. `dfsDepthLimited`)
+ * @param {{maxExpansions?: number, maxDepth?: number, metrics?: Metrics}} [options] - `maxDepth` = a legnagyobb kipróbált korlát
+ * @returns {Generator<SearchStep, SearchResult, void>}
+ */
+export function* searchIterativeDeepening(problem, algorithm, options = {}) {
+  const depthCap = options.maxDepth ?? 64;
+  // Megosztott metrics: az iterációk számlálói kumulálódnak (ez az iteratív
+  // mélyítés valódi ára), és a maxExpansions globális keretként érvényesül.
+  const metrics = options.metrics ?? new Metrics();
+  /** @type {SearchResult | null} */
+  let last = null;
+
+  for (let limit = 1; limit <= depthCap; limit += 1) {
+    const gen = search(problem, { ...algorithm, depthLimited: true }, { ...options, metrics, maxDepth: limit });
+    let res = gen.next();
+    while (!res.done) {
+      yield /** @type {SearchStep} */ (res.value);
+      res = gen.next();
+    }
+    last = /** @type {SearchResult} */ (res.value);
+
+    if (last.found || last.metrics.timeout) return last;
+  }
+
+  return last ?? { found: false, path: [], edges: [], goalNode: problem.startNode(), metrics };
 }
 
 /**

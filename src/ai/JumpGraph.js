@@ -4,15 +4,8 @@ import { step, Action } from '../core/step.js';
 import { buildJumpTable, jumpTableKey } from './JumpTable.js';
 
 /**
- * JumpGraph — a pályánként egyszer felépített makró-gráf (SPEC.md 5.3).
- *
- * - **Csomópont**: minden cella, amin Mario állhat (nem tömör cella, alatta
- *   tömör) → talaj- és platformtetők.
- * - **Él**: `A → B`, ha a JumpTable valamelyik jelöltje A-ból nyugalmi
- *   állásba viszi Mariót B-be, és a röppálya a VALÓDI pályán is
- *   végrehajtható (a `step()`-pel visszaszimulálva nem ütközik semmibe).
- * - **Élsúly**: a mozgás tick-száma (pozitív egész).
- * - **Él-metaadat**: az útközben érintett érmék id-listája.
+ * JumpGraph — pályánként egyszer épített makró-gráf, él = step()-tel újra
+ * validált JumpTable-jelölt, súly = tick (SPEC.md 5.3).
  *
  * @typedef {Object} JumpNode
  * @property {number} index @property {number} row @property {number} col
@@ -29,12 +22,7 @@ function cellKey(row, col) {
   return `${row},${col}`;
 }
 
-/**
- * A GOAL cellák leállítják a `step()`-et (a futás véget ér). Az él-validáció
- * SORÁN ez zavaró — ezért egy "fizikai" pályán a GOAL-t EMPTY-re cseréljük,
- * hogy Mario normálisan rá tudjon állni a cél-oszlop csomópontjára. A keresés
- * a csomópont oszlopa alapján dönti el, mi a cél; a valódi játékban a GOAL
- * cellára lépés továbbra is győzelmet jelent.
+/** A GOAL leállítaná a step()-et, ezért a validáláshoz EMPTY-re cseréljük.
  * @param {Level} level @returns {Level}
  */
 function toPhysicsLevel(level) {
@@ -74,22 +62,14 @@ function collectNodes(level) {
   return nodes;
 }
 
-// A cél-oszlopra állás megengedett float-hibája. A horgony-fázis PONTOSAN
-// egész oszlopra visz (a fizika 0,05 rácson mozog), ez csak a 0,05 tört
-// bináris reprezentációjának hibáját nyeli el.
+// Megengedett float-hiba a horgonyzásnál (a 0,05-rács kerekítési zaja).
 const ANCHOR_EPS = 1e-6;
 const POS_UNIT = 0.05; // a fizika kvantuma: minden Δpozíció 0,05 többszöröse
 const MAX_ALIGN_TICKS = 24;
 
 /**
- * "Horgony"-fázis a VALÓDI terepen: a landolási (tört oszlopú) nyugalmi
- * állapotból a legrövidebb akciósor, ami PONTOSAN a `targetCol` egész
- * oszlopra, `vCol = 0` nyugalomba viszi Mariót, VÉGIG ugyanazon a soron,
- * a valódi pálya peremeit/falait tiszteletben tartva. Ez teszi az éleket
- * folytonosan komponálhatóvá: minden él pontosan a cél-csomópont kanonikus
- * állapotában végződik, így a következő él pontosan onnan indul — nincs
- * halmozódó sodródás (M3-audit K1). BFS a `(col, vCol)` 0,05-rácson,
- * determinisztikus. `null`, ha a terep miatt nem horgonyozható.
+ * BFS a valódi terepen: a landolásból pontosan `targetCol` egész oszlopára,
+ * nyugalomba visz, hogy az élek folytonosan komponálhatók legyenek (M3-audit K1).
  * @param {Level} level @param {import('../core/RunState.js').RunState} start @param {number} targetCol
  * @returns {number[] | null}
  */
@@ -118,12 +98,7 @@ function alignToInteger(level, start, targetCol) {
 }
 
 /**
- * Egy JumpTable-jelölt kivitelezhető-e a valódi pályán A-ból B-be. A
- * kanonikus (nyugalmi) A-állapotból lefuttatjuk a fő-manővert; ha Mario B
- * cellájában, nyugalomban (de tört oszlopon) áll meg, a VALÓDI terepen
- * hozzáfűzünk egy horgony-fázist, ami PONTOSAN B egész oszlopára állítja.
- * Az így visszaadott, teljes akciósor B kanonikus állapotában végződik →
- * folytonosan komponálható a következő éllel.
+ * Egy jelölt kivitelezhető, ha a fő-manőver + a hozzáfűzött horgony-fázis is B kanonikus állapotára visz.
  * @param {Level} physics @param {JumpNode} from @param {JumpNode} to @param {Uint8Array} actions
  * @returns {{cost: number, coins: number[], actions: Uint8Array} | null}
  */
@@ -215,23 +190,65 @@ export function buildJumpGraph(level) {
   /** @type {JumpEdge[][]} */
   const edges = nodes.map(() => []);
 
+  // Csak akkor validáljuk a drágább (de érmét gyűjtő) jelölteket is, ha az ív befoglaló dobozában van érme.
+  /** @type {Map<number, number[]>} oszlop → érme-sorok */
+  const coinRowsByCol = new Map();
+  for (const coin of physics.coins) {
+    const rows = coinRowsByCol.get(coin.col) ?? [];
+    rows.push(coin.row);
+    coinRowsByCol.set(coin.col, rows);
+  }
+  const coinInArcBox = (fromNode, toNode) => {
+    const rowLo = fromNode.row - 6;
+    const rowHi = Math.max(fromNode.row, toNode.row) + 1;
+    for (let col = fromNode.col; col <= toNode.col; col += 1) {
+      const rows = coinRowsByCol.get(col);
+      if (!rows) continue;
+      for (const row of rows) if (row >= rowLo && row <= rowHi) return true;
+    }
+    return false;
+  };
+
   for (const from of nodes) {
     for (const [key, candidates] of entries) {
       const [dRow, dCol] = key.split(',').map(Number);
       const toIndex = indexByCell.get(cellKey(from.row + dRow, from.col + dCol));
       if (toIndex === undefined) continue;
       const to = nodes[toIndex];
+      const coinNearby = coinInArcBox(from, to);
+
+      /** @type {{cost: number, coins: number[], actions: Uint8Array} | null} */
+      let cheapest = null;
+      /** @type {{cost: number, coins: number[], actions: Uint8Array} | null} */
+      let mostCoins = null;
       for (const candidate of candidates) {
         const result = validateEdge(physics, from, to, candidate.actions);
-        if (result) {
-          edges[from.index].push({
-            to: toIndex,
-            cost: result.cost,
-            actions: result.actions, // fő-manőver + a terepen tuningolt horgony
-            coins: result.coins,
-          });
-          break; // a legolcsóbb kivitelezhető jelölt nyer (a lista rendezett)
-        }
+        if (!result) continue;
+        if (!cheapest) cheapest = result; // a lista költség szerint rendezett
+        if (result.coins.length > (mostCoins?.coins.length ?? 0)) mostCoins = result;
+        // Érme nélkül elég a legolcsóbb kivitelezhető jelölt (gyors út).
+        if (!coinNearby) break;
+      }
+      if (!cheapest) continue;
+
+      edges[from.index].push({
+        to: toIndex,
+        cost: cheapest.cost,
+        actions: cheapest.actions, // fő-manőver + a terepen tuningolt horgony
+        coins: cheapest.coins,
+      });
+      // Párhuzamos érme-változat él, ha egy drágább ív több érmét gyűjt (a collector kapuihoz kell).
+      if (
+        mostCoins &&
+        mostCoins !== cheapest &&
+        mostCoins.coins.some((coinId) => !cheapest.coins.includes(coinId))
+      ) {
+        edges[from.index].push({
+          to: toIndex,
+          cost: mostCoins.cost,
+          actions: mostCoins.actions,
+          coins: mostCoins.coins,
+        });
       }
     }
   }

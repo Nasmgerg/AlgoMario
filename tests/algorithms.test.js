@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateLevel } from '../src/world/LevelGenerator.js';
 import { buildJumpGraph } from '../src/ai/JumpGraph.js';
-import { createSpeedrunProblem, createWaypointProblem, collectorWaypoints } from '../src/ai/SearchProblem.js';
+import { createSpeedrunProblem, createWaypointProblem, collectorGates } from '../src/ai/SearchProblem.js';
 import { search, runToCompletion } from '../src/ai/search.js';
 import { bfs, dfs, dijkstra, astar, greedy, bestFirst } from '../src/ai/algorithms.js';
 import { BinaryHeap } from '../src/ai/frontiers/BinaryHeap.js';
@@ -133,21 +133,31 @@ describe('A hat algoritmus (SPEC.md 6.2, 11)', () => {
     expect(r.value.metrics.nodesExpanded).toBe(steps);
   });
 
-  it('collector mód: waypoint-lánc (start → érmék → cél) végigkereshető (5.4)', () => {
+  it('collector mód: kapu-élek — valós begyűjtő élek, elérhető láncban (5.4)', () => {
     const graph = buildJumpGraph(generateLevel({ seed: 4, length: 120, difficulty: 1, coinDensity: 0.9 }));
-    const waypoints = collectorWaypoints(graph);
-    expect(waypoints.length).toBeGreaterThanOrEqual(2); // legalább start + cél
-    let totalCost = 0;
-    for (let i = 0; i < waypoints.length - 1; i += 1) {
-      const res = runToCompletion(
-        search(createWaypointProblem(graph, waypoints[i], waypoints[i + 1]), astar, {
-          maxDepth: graph.nodes.length,
-        }),
-      );
-      expect(res.found, `waypoint ${i}→${i + 1} nem elérhető`).toBe(true);
-      totalCost += res.metrics.pathCost;
+    const gates = collectorGates(graph);
+    expect(gates.length).toBeGreaterThan(0);
+
+    const covered = new Set();
+    let cursor = graph.startIndex();
+    for (const gate of gates) {
+      // létező él, ami tényleg gyűjt érmét
+      expect(graph.edgesFrom(gate.from)).toContain(gate.edge);
+      expect(gate.edge.coins.length).toBeGreaterThan(0);
+      // a lánc bejárható: a kurzortól a kapu elejéig van út
+      if (gate.from !== cursor) {
+        const res = runToCompletion(
+          search(createWaypointProblem(graph, cursor, gate.from), astar, {
+            maxDepth: graph.nodes.length,
+          }),
+        );
+        expect(res.found, `kapu (${gate.from}) nem elérhető a láncban`).toBe(true);
+      }
+      cursor = gate.edge.to;
+      for (const coinId of gate.edge.coins) covered.add(coinId);
     }
-    expect(totalCost).toBeGreaterThan(0);
+    // a pálya érméinek nagy részét lefedik a kapuk
+    expect(covered.size).toBeGreaterThanOrEqual(10);
   });
 
   it('maxExpansions limit → timeout jelzés, részleges legjobb csomóponttal (12)', () => {
