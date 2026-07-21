@@ -99,8 +99,12 @@ export class WatchAI {
     this.executionTick = 0;
     /** A végrehajtás során TÉNYLEGESEN begyűjtött érmék száma (szimulált). */
     this.coinsOnPath = 0;
+    /** A végrehajtás során TÉNYLEGESEN kiütött surprise blokkok száma (szimulált). */
+    this.surprisesOnPath = 0;
     /** @type {{tick: number, coinId: number}[]} tick-pontos érme-események */
     this.coinEvents = [];
+    /** @type {{tick: number, surpriseId: number}[]} tick-pontos surprise-események */
+    this.surpriseEvents = [];
     // Frame-szám + falidő a panelnek: a planTimeMs (CPU-idő) önmagában nem jelzi az ütemezés széthúzottságát.
     this.searchFrames = 0;
     this.searchWallMs = 0;
@@ -244,7 +248,9 @@ export class WatchAI {
     this.trajectory = run.trajectory;
     this.executionTick = 0;
     this.coinsOnPath = run.collectedCoins.size;
+    this.surprisesOnPath = run.poppedSurprises.size;
     this.coinEvents = run.coinEvents;
+    this.surpriseEvents = run.surpriseEvents;
     if (!run.reachedGoal) {
       this.phase = WatchPhase.NO_SOLUTION;
       this.failureReason = 'A terv végrehajtása eltért a tervezettől (belső hiba).';
@@ -275,6 +281,15 @@ export class WatchAI {
   get coinsCollected() {
     let count = 0;
     for (const event of this.coinEvents) {
+      if (event.tick <= this.executionTick) count += 1;
+    }
+    return count;
+  }
+
+  /** @returns {number} az aktuális lejátszási tickig kiütött surprise blokkok száma */
+  get surprisesCollected() {
+    let count = 0;
+    for (const event of this.surpriseEvents) {
       if (event.tick <= this.executionTick) count += 1;
     }
     return count;
@@ -317,6 +332,8 @@ export class WatchAI {
       searchWallMs: this.searchWallMs,
       coinsOnPath: this.coinsOnPath,
       coinsCollected: this.coinsCollected,
+      surprisesOnPath: this.surprisesOnPath,
+      surprisesCollected: this.surprisesCollected,
       leg: `${Math.min(this._planIndex + 1, this._plan.length)}/${this._plan.length}`,
       graphNodes: this.graph.nodes.length,
       graphEdges: this.graph.edgeCount(),

@@ -120,6 +120,29 @@ describe('WatchAI mód (SPEC.md 8.2, M4)', () => {
     expect(watch.stats.goalMode).toBe(GoalMode.COLLECTOR);
   });
 
+  it('collector célmódban a surprise blokkokat is kiüti, nem csak az érméket (5.4, 3.5)', () => {
+    // A surprise 500 pontot ér az érme 100-jával szemben, ezért a collector
+    // tervnek céloznia kell rájuk — korábban csak véletlenül ütött ki egyet.
+    for (const seed of [4, 7]) {
+      const level = generateLevel({ seed, length: 120, difficulty: 2, coinDensity: 0.9 });
+      expect(level.surprises.length, `seed ${seed}: nincs surprise a pályán`).toBeGreaterThan(0);
+
+      const speedrun = runWatchToEnd(new WatchAI(level, { algorithm: 'astar' }));
+      const collector = runWatchToEnd(
+        new WatchAI(level, { algorithm: 'astar', goalMode: GoalMode.COLLECTOR }),
+      );
+      expect(collector.phase).toBe(WatchPhase.DONE);
+
+      // A pálya surprise-ainak legalább a felét kiüti, és többet, mint a speedrun.
+      expect(collector.surprisesOnPath).toBeGreaterThanOrEqual(level.surprises.length / 2);
+      expect(collector.surprisesOnPath).toBeGreaterThan(speedrun.surprisesOnPath);
+
+      // A lejátszás végén a számláló a tényleges eseményekkel egyezik (a vizualizáció ebből dolgozik).
+      expect(collector.surprisesCollected).toBe(collector.surprisesOnPath);
+      expect(collector.surpriseEvents).toHaveLength(collector.surprisesOnPath);
+    }
+  });
+
   it('a végrehajtás a folytonos (sodródásmentes) trajektórián halad végig', () => {
     const level = generateLevel({ seed: 7, length: 120, difficulty: 3 });
     const watch = new WatchAI(level, { algorithm: 'astar' });

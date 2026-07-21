@@ -1,6 +1,7 @@
 import { Level, CellType, isSolidCellType } from '../world/Level.js';
 import { createRunStateAt, RunStatus } from '../core/RunState.js';
 import { step, Action } from '../core/step.js';
+import { SCORING } from '../config/scoring.js';
 import { buildJumpTable, jumpTableKey } from './JumpTable.js';
 
 /**
@@ -14,8 +15,18 @@ import { buildJumpTable, jumpTableKey } from './JumpTable.js';
  * @property {number} to      - cél csomópont indexe
  * @property {number} cost    - tickek száma (pozitív)
  * @property {Uint8Array} actions
- * @property {number[]} coins  - útközben érintett érmék id-jei
+ * @property {number[]} coins      - útközben begyűjtött érmék id-jei
+ * @property {number[]} surprises  - útközben kiütött surprise blokkok id-jei
  */
+
+/** Egy él begyűjthető tárgyainak pontértéke; a surprise ötszöröse az érmének (SPEC.md 3.5, 5.4).
+ * @param {{coins: number[], surprises: number[]} | null} edge
+ * @returns {number}
+ */
+export function edgeItemValue(edge) {
+  if (!edge) return 0;
+  return edge.coins.length * SCORING.COIN + edge.surprises.length * SCORING.SURPRISE;
+}
 
 /** @param {number} row @param {number} col @returns {string} */
 function cellKey(row, col) {
@@ -100,7 +111,7 @@ function alignToInteger(level, start, targetCol) {
 /**
  * Egy jelölt kivitelezhető, ha a fő-manőver + a hozzáfűzött horgony-fázis is B kanonikus állapotára visz.
  * @param {Level} physics @param {JumpNode} from @param {JumpNode} to @param {Uint8Array} actions
- * @returns {{cost: number, coins: number[], actions: Uint8Array} | null}
+ * @returns {{cost: number, coins: number[], surprises: number[], actions: Uint8Array} | null}
  */
 function validateEdge(physics, from, to, actions) {
   let state = createRunStateAt(from.row, from.col);
@@ -125,7 +136,12 @@ function validateEdge(physics, from, to, actions) {
   const full = new Uint8Array(actions.length + align.length);
   full.set(actions, 0);
   full.set(align, actions.length);
-  return { cost: full.length, coins: [...state.collectedCoins], actions: full };
+  return {
+    cost: full.length,
+    coins: [...state.collectedCoins],
+    surprises: [...state.poppedSurprises],
+    actions: full,
+  };
 }
 
 /** A makró-gráf (SPEC.md 5.3). */
@@ -190,19 +206,19 @@ export function buildJumpGraph(level) {
   /** @type {JumpEdge[][]} */
   const edges = nodes.map(() => []);
 
-  // Csak akkor validáljuk a drágább (de érmét gyűjtő) jelölteket is, ha az ív befoglaló dobozában van érme.
-  /** @type {Map<number, number[]>} oszlop → érme-sorok */
-  const coinRowsByCol = new Map();
-  for (const coin of physics.coins) {
-    const rows = coinRowsByCol.get(coin.col) ?? [];
-    rows.push(coin.row);
-    coinRowsByCol.set(coin.col, rows);
+  // Csak akkor validáljuk a drágább jelölteket is, ha az ív befoglaló dobozában van begyűjthető tárgy (érme vagy surprise).
+  /** @type {Map<number, number[]>} oszlop → érme/surprise sorok */
+  const itemRowsByCol = new Map();
+  for (const item of [...physics.coins, ...physics.surprises]) {
+    const rows = itemRowsByCol.get(item.col) ?? [];
+    rows.push(item.row);
+    itemRowsByCol.set(item.col, rows);
   }
-  const coinInArcBox = (fromNode, toNode) => {
+  const itemInArcBox = (fromNode, toNode) => {
     const rowLo = fromNode.row - 6;
     const rowHi = Math.max(fromNode.row, toNode.row) + 1;
     for (let col = fromNode.col; col <= toNode.col; col += 1) {
-      const rows = coinRowsByCol.get(col);
+      const rows = itemRowsByCol.get(col);
       if (!rows) continue;
       for (const row of rows) if (row >= rowLo && row <= rowHi) return true;
     }
@@ -215,19 +231,19 @@ export function buildJumpGraph(level) {
       const toIndex = indexByCell.get(cellKey(from.row + dRow, from.col + dCol));
       if (toIndex === undefined) continue;
       const to = nodes[toIndex];
-      const coinNearby = coinInArcBox(from, to);
+      const itemNearby = itemInArcBox(from, to);
 
-      /** @type {{cost: number, coins: number[], actions: Uint8Array} | null} */
+      /** @type {{cost: number, coins: number[], surprises: number[], actions: Uint8Array} | null} */
       let cheapest = null;
-      /** @type {{cost: number, coins: number[], actions: Uint8Array} | null} */
-      let mostCoins = null;
+      /** @type {{cost: number, coins: number[], surprises: number[], actions: Uint8Array} | null} */
+      let richest = null;
       for (const candidate of candidates) {
         const result = validateEdge(physics, from, to, candidate.actions);
         if (!result) continue;
         if (!cheapest) cheapest = result; // a lista költség szerint rendezett
-        if (result.coins.length > (mostCoins?.coins.length ?? 0)) mostCoins = result;
-        // Érme nélkül elég a legolcsóbb kivitelezhető jelölt (gyors út).
-        if (!coinNearby) break;
+        if (edgeItemValue(result) > edgeItemValue(richest)) richest = result;
+        // Begyűjthető tárgy nélkül elég a legolcsóbb kivitelezhető jelölt (gyors út).
+        if (!itemNearby) break;
       }
       if (!cheapest) continue;
 
@@ -236,18 +252,16 @@ export function buildJumpGraph(level) {
         cost: cheapest.cost,
         actions: cheapest.actions, // fő-manőver + a terepen tuningolt horgony
         coins: cheapest.coins,
+        surprises: cheapest.surprises,
       });
-      // Párhuzamos érme-változat él, ha egy drágább ív több érmét gyűjt (a collector kapuihoz kell).
-      if (
-        mostCoins &&
-        mostCoins !== cheapest &&
-        mostCoins.coins.some((coinId) => !cheapest.coins.includes(coinId))
-      ) {
+      // Párhuzamos gyűjtő-változat él, ha egy drágább ív többet ér (a collector kapuihoz kell).
+      if (richest && richest !== cheapest && edgeItemValue(richest) > edgeItemValue(cheapest)) {
         edges[from.index].push({
           to: toIndex,
-          cost: mostCoins.cost,
-          actions: mostCoins.actions,
-          coins: mostCoins.coins,
+          cost: richest.cost,
+          actions: richest.actions,
+          coins: richest.coins,
+          surprises: richest.surprises,
         });
       }
     }

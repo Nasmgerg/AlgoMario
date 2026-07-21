@@ -138,12 +138,13 @@ describe('A hat algoritmus (SPEC.md 6.2, 11)', () => {
     const gates = collectorGates(graph);
     expect(gates.length).toBeGreaterThan(0);
 
-    const covered = new Set();
+    const coveredCoins = new Set();
+    const coveredSurprises = new Set();
     let cursor = graph.startIndex();
     for (const gate of gates) {
-      // létező él, ami tényleg gyűjt érmét
+      // létező él, ami tényleg gyűjt valamit (érmét VAGY surprise-t)
       expect(graph.edgesFrom(gate.from)).toContain(gate.edge);
-      expect(gate.edge.coins.length).toBeGreaterThan(0);
+      expect(gate.edge.coins.length + gate.edge.surprises.length).toBeGreaterThan(0);
       // a lánc bejárható: a kurzortól a kapu elejéig van út
       if (gate.from !== cursor) {
         const res = runToCompletion(
@@ -154,10 +155,13 @@ describe('A hat algoritmus (SPEC.md 6.2, 11)', () => {
         expect(res.found, `kapu (${gate.from}) nem elérhető a láncban`).toBe(true);
       }
       cursor = gate.edge.to;
-      for (const coinId of gate.edge.coins) covered.add(coinId);
+      for (const coinId of gate.edge.coins) coveredCoins.add(coinId);
+      for (const surpriseId of gate.edge.surprises) coveredSurprises.add(surpriseId);
     }
     // a pálya érméinek nagy részét lefedik a kapuk
-    expect(covered.size).toBeGreaterThanOrEqual(10);
+    expect(coveredCoins.size).toBeGreaterThanOrEqual(10);
+    // a surprise blokkok sem maradnak ki (SPEC 3.5: 500 pont, az érme ötszöröse)
+    expect(coveredSurprises.size).toBeGreaterThan(0);
   });
 
   it('maxExpansions limit → timeout jelzés, részleges legjobb csomóponttal (12)', () => {

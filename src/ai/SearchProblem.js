@@ -1,4 +1,5 @@
 import { admissibleHeuristic } from './Heuristics.js';
+import { edgeItemValue } from './JumpGraph.js';
 
 /** Keresési problémák a JumpGraph fölött (SPEC.md 5.4, 6.1): a {@link import('./search.js').search} elvárt interfésze — `startNode()`, `isGoal(n)`, `neighbors(n)`, `heuristic(n)`. */
 
@@ -42,25 +43,42 @@ export function createWaypointProblem(graph, startIndex, targetIndex) {
  * @property {import('./JumpGraph.js').JumpEdge} edge - a kényszerített begyűjtő él
  */
 
-/** Collector "kapuk" (SPEC.md 5.4): érménként a legolcsóbb, ténylegesen begyűjtő él; a terv ide navigál, majd kényszerítetten bejárja. Oszlop szerint rendezett, nearest-neighbour sorrendű, NEM optimális.
+/** Kapu-sorrend: a balról jobbra haladó lánc miatt előbb a korábbi oszlop, azonos oszlopnál a többet érő, végül az olcsóbb él nyer.
+ * @param {import('./JumpGraph.js').JumpGraph} graph
+ * @param {CollectorGate} candidate @param {CollectorGate} current
+ * @returns {boolean}
+ */
+function isBetterGate(graph, candidate, current) {
+  const candidateCol = graph.nodes[candidate.from].col;
+  const currentCol = graph.nodes[current.from].col;
+  if (candidateCol !== currentCol) return candidateCol < currentCol;
+  const candidateValue = edgeItemValue(candidate.edge);
+  const currentValue = edgeItemValue(current.edge);
+  if (candidateValue !== currentValue) return candidateValue > currentValue;
+  return candidate.edge.cost < current.edge.cost;
+}
+
+/** Collector "kapuk" (SPEC.md 5.4): tárgyanként (érme ÉS surprise) a ténylegesen begyűjtő élek; a terv a kapu elejére navigál, majd kényszerítetten bejárja. Nearest-neighbour sorrendű, NEM optimális.
  * @param {import('./JumpGraph.js').JumpGraph} graph
  * @returns {CollectorGate[]}
  */
 export function collectorGates(graph) {
-  // Érménként az ÖSSZES hordozó él (nem csak a legolcsóbb), hogy a lánc-építés választhasson köztük.
-  /** @type {Map<number, CollectorGate[]>} */
-  const carriersByCoin = new Map();
+  // Tárgyanként az ÖSSZES hordozó él (nem csak a legolcsóbb), hogy a lánc-építés választhasson köztük.
+  /** @type {Map<string, CollectorGate[]>} */
+  const carriersByItem = new Map();
+  const addCarrier = (itemKey, gate) => {
+    const list = carriersByItem.get(itemKey) ?? [];
+    list.push(gate);
+    carriersByItem.set(itemKey, list);
+  };
   for (let from = 0; from < graph.nodes.length; from += 1) {
     for (const edge of graph.edgesFrom(from)) {
-      for (const coinId of edge.coins) {
-        const list = carriersByCoin.get(coinId) ?? [];
-        list.push({ from, edge });
-        carriersByCoin.set(coinId, list);
-      }
+      for (const coinId of edge.coins) addCarrier(`c${coinId}`, { from, edge });
+      for (const surpriseId of edge.surprises) addCarrier(`s${surpriseId}`, { from, edge });
     }
   }
 
-  // Mohó lánc-építés: mindig a kurzorból ténylegesen elérhető, legkorábbi (tie: legolcsóbb) hordozót vesszük.
+  // Mohó lánc-építés: mindig a kurzorból ténylegesen elérhető, legjobb hordozót vesszük.
   const { canReach } = reachabilityClosure(graph);
   const gates = [];
   const covered = new Set();
@@ -69,22 +87,17 @@ export function collectorGates(graph) {
   for (;;) {
     /** @type {CollectorGate | null} */
     let next = null;
-    for (const [coinId, carriers] of carriersByCoin) {
-      if (covered.has(coinId)) continue;
+    for (const [itemKey, carriers] of carriersByItem) {
+      if (covered.has(itemKey)) continue;
       for (const gate of carriers) {
         if (!canReach(cursor, gate.from)) continue;
-        if (
-          !next ||
-          graph.nodes[gate.from].col < graph.nodes[next.from].col ||
-          (graph.nodes[gate.from].col === graph.nodes[next.from].col && gate.edge.cost < next.edge.cost)
-        ) {
-          next = gate;
-        }
+        if (!next || isBetterGate(graph, gate, next)) next = gate;
       }
     }
     if (!next) break;
     gates.push(next);
-    for (const coinId of next.edge.coins) covered.add(coinId);
+    for (const coinId of next.edge.coins) covered.add(`c${coinId}`);
+    for (const surpriseId of next.edge.surprises) covered.add(`s${surpriseId}`);
     cursor = next.edge.to;
   }
   return gates;

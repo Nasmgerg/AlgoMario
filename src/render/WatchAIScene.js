@@ -6,8 +6,6 @@ import { SearchOverlay } from './SearchOverlay.js';
 import { preloadSprites, buildLevelSprites, syncCollectibles, CELL_SIZE } from './Sprites.js';
 import { preloadAudio, startBackgroundMusic } from './Audio.js';
 
-const EMPTY_SET = new Set();
-
 /** Watch AI scene (SPEC.md 8.2, M4): keresés (SearchOverlay festi) → végrehajtás (a talált útvonal lejátszása). Csak OLVASSA a modes/WatchAI kimenetét. */
 export class WatchAIScene extends Phaser.Scene {
   constructor() {
@@ -64,6 +62,8 @@ export class WatchAIScene extends Phaser.Scene {
     // (más seed/algoritmus) tisztán indul, ne a korábbi tervé maradjon.
     this._collectedSet = new Set();
     this._coinEventIndex = 0;
+    this._poppedSet = new Set();
+    this._surpriseEventIndex = 0;
     // Tört sebességekhez (0.25×/0.5× lassított mód): frame-enként gyűlik,
     // és csak egész lépésnyi budget megy a keresőnek.
     this._stepAccumulator = 0;
@@ -131,19 +131,22 @@ export class WatchAIScene extends Phaser.Scene {
     camera.centerOn(mid.x + (x - mid.x) * 0.18, mid.y + (y - mid.y) * 0.18);
   }
 
-  /** A begyűjtött érmék tick-pontos elrejtése a `runContinuous` érme-eseményei alapján, nem él-végi kötegekben.
+  /** A begyűjtött érmék és a kiütött surprise blokkok tick-pontos frissítése a `runContinuous` eseményei alapján, nem él-végi kötegekben.
    * @returns {{collectedCoins: Set<number>, poppedSurprises: Set<number>}}
    */
   _executionRunState() {
-    const events = this.watch.coinEvents;
-    while (
-      this._coinEventIndex < events.length &&
-      events[this._coinEventIndex].tick <= this.watch.executionTick
-    ) {
-      this._collectedSet.add(events[this._coinEventIndex].coinId);
+    const tick = this.watch.executionTick;
+    const coins = this.watch.coinEvents;
+    while (this._coinEventIndex < coins.length && coins[this._coinEventIndex].tick <= tick) {
+      this._collectedSet.add(coins[this._coinEventIndex].coinId);
       this._coinEventIndex += 1;
     }
-    return { collectedCoins: this._collectedSet, poppedSurprises: EMPTY_SET };
+    const surprises = this.watch.surpriseEvents;
+    while (this._surpriseEventIndex < surprises.length && surprises[this._surpriseEventIndex].tick <= tick) {
+      this._poppedSet.add(surprises[this._surpriseEventIndex].surpriseId);
+      this._surpriseEventIndex += 1;
+    }
+    return { collectedCoins: this._collectedSet, poppedSurprises: this._poppedSet };
   }
 
   /** @param {number} nodeIndex */

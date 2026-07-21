@@ -73,7 +73,7 @@ export class PlanExecutor {
   /**
    * Valódi folytonos lejátszás, újrahorgonyzás nélkül: egyetlen `step()`-lánc a start-állapottól, élhatáronként mérve a tervezettől való eltérést (SPEC.md 7).
    * @param {number[]} path @param {import('./JumpGraph.js').JumpEdge[]} edges
-   * @returns {{ok: boolean, reachedGoal: boolean, maxDrift: number, ticks: number, trajectory: {row:number,col:number}[], failedEdge: number, collectedCoins: Set<number>, coinEvents: {tick: number, coinId: number}[]}}
+   * @returns {{ok: boolean, reachedGoal: boolean, maxDrift: number, ticks: number, trajectory: {row:number,col:number}[], failedEdge: number, collectedCoins: Set<number>, poppedSurprises: Set<number>, coinEvents: {tick: number, coinId: number}[], surpriseEvents: {tick: number, surpriseId: number}[]}}
    */
   runContinuous(path, edges) {
     const nodes = this.graph.nodes;
@@ -84,17 +84,29 @@ export class PlanExecutor {
     const trajectory = [{ row: state.row, col: state.col }];
     let maxDrift = 0;
     let ticks = 0;
-    // Tick-pontos érme-események, hogy a vizualizáció valós időben tüntethesse el őket (nem él-végi kötegekben).
+    // Tick-pontos érme- és surprise-események, hogy a vizualizáció valós időben frissíthesse őket (nem él-végi kötegekben).
     /** @type {{tick: number, coinId: number}[]} */
     const coinEvents = [];
+    /** @type {{tick: number, surpriseId: number}[]} */
+    const surpriseEvents = [];
     const seenCoins = new Set();
+    const seenSurprises = new Set();
 
-    const recordCoins = () => {
-      if (state.collectedCoins.size === seenCoins.size) return;
-      for (const coinId of state.collectedCoins) {
-        if (!seenCoins.has(coinId)) {
-          seenCoins.add(coinId);
-          coinEvents.push({ tick: ticks, coinId });
+    const recordItems = () => {
+      if (state.collectedCoins.size !== seenCoins.size) {
+        for (const coinId of state.collectedCoins) {
+          if (!seenCoins.has(coinId)) {
+            seenCoins.add(coinId);
+            coinEvents.push({ tick: ticks, coinId });
+          }
+        }
+      }
+      if (state.poppedSurprises.size !== seenSurprises.size) {
+        for (const surpriseId of state.poppedSurprises) {
+          if (!seenSurprises.has(surpriseId)) {
+            seenSurprises.add(surpriseId);
+            surpriseEvents.push({ tick: ticks, surpriseId });
+          }
         }
       }
     };
@@ -104,7 +116,7 @@ export class PlanExecutor {
         state = step(state, action, this.physicsLevel);
         trajectory.push({ row: state.row, col: state.col });
         ticks += 1;
-        recordCoins();
+        recordItems();
         if (state.status === RunStatus.FELL) {
           return {
             ok: false,
@@ -114,7 +126,9 @@ export class PlanExecutor {
             trajectory,
             failedEdge: i,
             collectedCoins: state.collectedCoins,
+            poppedSurprises: state.poppedSurprises,
             coinEvents,
+            surpriseEvents,
           };
         }
       }
@@ -131,10 +145,11 @@ export class PlanExecutor {
       ticks,
       trajectory,
       failedEdge: -1,
-      // A szimuláció TÉNYLEGESEN begyűjtött érméi — a "hány érme lesz meg"
-      // statisztika igazságforrása (nem az él-metaadat).
+      // A szimuláció TÉNYLEGESEN begyűjtött tárgyai — a statisztika igazságforrása (nem az él-metaadat).
       collectedCoins: state.collectedCoins,
+      poppedSurprises: state.poppedSurprises,
       coinEvents,
+      surpriseEvents,
     };
   }
 

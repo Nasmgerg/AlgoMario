@@ -58,6 +58,7 @@ export class StatsPanel {
       ${row('Tervezés (CPU)', `${stats.planTimeMs.toFixed(1)} ms`)}
       ${row('Keresés (fal)', `${(stats.searchWallMs / 1000).toFixed(1)} s / ${stats.searchFrames} frame`)}
       ${row('Begyűjtve érme', `${stats.coinsCollected} / ${stats.coinsOnPath}`)}
+      ${row('Kiütve surprise', `${stats.surprisesCollected} / ${stats.surprisesOnPath}`)}
       ${row('Lejátszás', `${stats.executionTick} / ${stats.executionTicks} tick`)}
       <hr />
       ${row('Gráf csomópont', stats.graphNodes)}
