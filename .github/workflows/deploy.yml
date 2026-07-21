@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+# Minden main-re push-nál: teszt → build → (csak sikeres build esetén) deploy.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Egyszerre csak egy deploy fusson; egy új push-nál a folyamatban lévő
+# deploy NEM szakad meg (in-progress build ne vesszen el egy gyors dupla push miatt).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js beállítása
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Függőségek telepítése
+        run: npm ci
+
+      - name: Tesztek (Vitest — core/world/ai, Phaser nélkül)
+        run: npm test
+
+      - name: Production build
+        # A --base felülírja a vite.config.js base-ét build időben, a
+        # GitHub Pages projekt-oldal alkönyvtárához igazítva — a repót
+        # NEM kell átnevezni vagy a forráskódot módosítani, ha a repo
+        # neve változna, csak ezt az egy sort kell frissíteni.
+        run: npm run build -- --base=/AlgoMario/
+
+      - name: GitHub Pages előkészítése
+        uses: actions/configure-pages@v5
+
+      - name: Build feltöltése Pages artifactként
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages-re
+        id: deployment
+        uses: actions/deploy-pages@v4
