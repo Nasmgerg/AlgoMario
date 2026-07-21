@@ -47,14 +47,17 @@ export class BenchmarkPanel {
         this.summary = message.summary;
         this.csv = message.csv;
         this.status = `Kész: ${message.rows.length} futás.`;
+        this._releaseWorker();
         this._render();
       } else if (message.type === 'error') {
         this.status = `Hiba a mérés közben: ${message.message}`;
+        this._releaseWorker();
         this._render();
       }
     };
     this.worker.onerror = (event) => {
       this.status = `Worker hiba: ${event.message}`;
+      this._releaseWorker();
       this._render();
     };
     this.worker.postMessage(options);
@@ -154,8 +157,17 @@ export class BenchmarkPanel {
     if (csvButton) csvButton.addEventListener('click', () => this._downloadCsv());
   }
 
-  destroy() {
-    if (this.worker) this.worker.terminate();
+  _releaseWorker() {
+    if (!this.worker) return;
+    this.worker.terminate();
     this.worker = null;
+  }
+
+  /** Módváltáskor hívandó: a félbehagyott mérés Workere különben a háttérben tovább terhelné a CPU-t. */
+  stopMeasurement() {
+    if (!this.worker) return;
+    this._releaseWorker();
+    this.status = 'A mérés megszakadt (módváltás).';
+    this._render();
   }
 }

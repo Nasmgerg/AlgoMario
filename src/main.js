@@ -92,6 +92,8 @@ function showBenchmark() {
 
 function applyMode() {
   const mode = controls.modeSelect.value;
+  // A Worker túléli a panel elrejtését, ezért a mérést explicit le kell állítani, mielőtt az új mód elindul.
+  if (mode !== 'benchmark') benchmarkPanel.stopMeasurement();
   if (mode === 'play') startPlayYourself(controls.config);
   else if (mode === 'race') startRace(controls.raceConfig);
   else if (mode === 'benchmark') showBenchmark();

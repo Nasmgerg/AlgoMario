@@ -18,6 +18,7 @@ export function preloadAudio(scene) {
 export function startBackgroundMusic(scene, options = {}) {
   const music = scene.sound.add(THEME_KEY, { loop: true, volume: options.volume ?? DEFAULT_VOLUME });
   music.play();
-  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => music.stop());
+  // A SoundManager globális, nem scene-enkénti: leállításkor meg is kell semmisíteni, különben minden módváltás egy újabb élő példányt hagy maga után.
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => music.destroy());
   return music;
 }
