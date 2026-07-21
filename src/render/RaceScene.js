@@ -75,9 +75,11 @@ export class RaceScene extends Phaser.Scene {
   }
 
   _applyZoom() {
-    const worldHeightPx = this.level.height * CELL_SIZE;
-    this.cameras.main.setSize(this.scale.width, this.scale.height);
-    this.cameras.main.setZoom(this.scale.height / worldHeightPx);
+    // Elrejtett canvasnál a ScaleManager 0×0-t ad — abból 0 zoom lenne, ami láthatatlanra állítaná a kamerát.
+    const { width, height } = this.scale;
+    if (width <= 0 || height <= 0) return;
+    this.cameras.main.setSize(width, height);
+    this.cameras.main.setZoom(height / (this.level.height * CELL_SIZE));
   }
 
   /** @param {number} time @param {number} delta */

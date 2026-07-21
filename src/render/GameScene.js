@@ -75,6 +75,8 @@ export class GameScene extends Phaser.Scene {
    * @param {number} width @param {number} height
    */
   _applyResponsiveLayout(width, height) {
+    // Elrejtett canvasnál a ScaleManager 0×0-t ad — abból 0 zoom lenne, ami láthatatlanra állítaná a kamerát.
+    if (width <= 0 || height <= 0) return;
     const zoom = height / this._worldHeightPx;
     this.cameras.main.setSize(width, height);
     this.cameras.main.setZoom(zoom);

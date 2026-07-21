@@ -34,14 +34,14 @@ let controls;
 // A panelek a vezérlők UTÁN kerülnek a sidebarba, hogy a vezérlősáv maradjon felül.
 const panelHost = document.createElement('div');
 
-/** Determinisztikus scene-váltás: minden más scene-t explicit leállítunk indítás előtt (a Phaser `start()` kétértelmű lenne enélkül).
+/** Determinisztikus scene-váltás: MINDEN scene-t leállítunk indítás előtt, állapottól függetlenül — a Phaser `start()` némán no-opol, ha a cél scene még START/LOADING/CREATING fázisban van, a `stop()` viszont bármely állapotból SHUTDOWN-ra visz.
  * @param {string} startKey @param {object} data
  */
 function switchScene(startKey, data) {
   if (game.isBooted) {
-    for (const key of SCENE_KEYS) {
-      if (game.scene.isActive(key) || game.scene.isPaused(key)) game.scene.stop(key);
-    }
+    for (const key of SCENE_KEYS) game.scene.stop(key);
+    // A ScaleManager csak ~500 ms-onként méri újra a szülőt; ha a canvas épp most lett újra látható, a scene create()-je 0×0 méretet látna.
+    if (game.scale.getParentBounds()) game.scale.refresh();
   }
   if (startKey) game.scene.start(startKey, data);
 }
