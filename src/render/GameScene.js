@@ -6,15 +6,11 @@ import { PlayYourself } from '../modes/PlayYourself.js';
 import { HumanController } from '../ui/Controls.js';
 import { HUD } from '../ui/HUD.js';
 import { preloadSprites, buildLevelSprites, syncCollectibles, CELL_SIZE } from './Sprites.js';
+import { preloadAudio, startBackgroundMusic } from './Audio.js';
 
 const FIXED_STEP_MS = 1000 / PHYSICS.TICK_RATE;
 
-/**
- * Play Yourself Phaser scene (SPEC.md 8.1, M2 mérföldkő). A fizika és az
- * ütközés teljes egészében a `core/step.js`-ből jön — ez a fájl csak
- * renderel és fixed-timestep ütemben hívja a szimulációt (D3: Phaser
- * Arcade Physics nincs használva).
- */
+/** Play Yourself Phaser scene (SPEC.md 8.1); a fizikát a `core/step.js` adja, ez a réteg csak renderel fixed-timestep ütemben (D3: Arcade Physics nincs használva). */
 export class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
@@ -29,12 +25,14 @@ export class GameScene extends Phaser.Scene {
 
   preload() {
     preloadSprites(this);
+    preloadAudio(this);
   }
 
   create() {
     this.level = generateLevel({ seed: this.seed, length: this.length, difficulty: this.difficulty });
     this.session = new PlayYourself(this.level, new HumanController(this.input.keyboard));
     this.accumulatorMs = 0;
+    startBackgroundMusic(this);
 
     this._worldWidthPx = this.level.length * CELL_SIZE;
     this._worldHeightPx = this.level.height * CELL_SIZE;
@@ -63,20 +61,17 @@ export class GameScene extends Phaser.Scene {
 
     this.input.keyboard.on('keydown-R', () => this.restart());
 
-    // Kezdeti elrendezés, majd minden tényleges átméretezéskor újra —
-    // Scale.RESIZE módban a kamerák méretét a ScaleManager nem igazítja
-    // automatikusan, ezt a scene-nek kell kézben tartania.
+    // Kezdeti elrendezés + minden átméretezéskor újra (Scale.RESIZE nem igazítja a kamerákat automatikusan); a listener leállításkor lekerül.
     this._applyResponsiveLayout(this.scale.width, this.scale.height);
-    this.scale.on('resize', (gameSize) => this._applyResponsiveLayout(gameSize.width, gameSize.height));
+    const onResize = (gameSize) => this._applyResponsiveLayout(gameSize.width, gameSize.height);
+    this.scale.on('resize', onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', onResize));
 
     this._syncMarioSprite();
     this.hud.update(this.session.state);
   }
 
-  /**
-   * A pálya teljes magassága (16 sor) mindig beférjen a viewportba,
-   * bármilyen ablakalaknál — a zoom kizárólag a magasságból számolódik,
-   * a szélesség szabadon igazodik (több/kevesebb oszlop látszik).
+  /** A pálya teljes magassága mindig beférjen a viewportba; a zoom kizárólag a magasságból számolódik, a szélesség szabadon igazodik.
    * @param {number} width @param {number} height
    */
   _applyResponsiveLayout(width, height) {
