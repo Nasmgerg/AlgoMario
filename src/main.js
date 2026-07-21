@@ -20,6 +20,8 @@ const config = {
     mode: Phaser.Scale.RESIZE,
     width: window.innerWidth,
     height: window.innerHeight,
+    // Elrejtett canvasnál (benchmark mód) a szülő 0x0, amiből a ScaleManager 0 méretű WebGL render targetet csinálna: az "Incomplete Attachment" kivétel megölné a render loopot. A minimum ezt zárja ki minden útvonalon (poll, DOM resize, explicit refresh).
+    min: { width: 1, height: 1 },
   },
   scene: [WatchAIScene, GameScene, RaceScene],
 };
