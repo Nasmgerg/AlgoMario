@@ -110,7 +110,7 @@ export class WatchAIControls {
     this.seedCountInput = document.createElement('input');
     this.seedCountInput.type = 'number';
     this.seedCountInput.min = '1';
-    this.seedCountInput.max = '200';
+    this.seedCountInput.max = '500';
     this.seedCountInput.value = '10';
     this.seedCountInput.className = 'ctl-seed';
 
@@ -256,7 +256,7 @@ export class WatchAIControls {
 
   /** @returns {{seedCount: number, length: number, difficulty: number, weight: number}} */
   get benchmarkConfig() {
-    const seedCount = Math.max(1, Math.min(200, Number(this.seedCountInput.value) || 10));
+    const seedCount = Math.max(1, Math.min(500, Number(this.seedCountInput.value) || 10));
     return { seedCount, length: 100, difficulty: 2, weight: Number(this.weightInput.value) || 3 };
   }
 
