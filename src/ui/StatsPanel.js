@@ -23,6 +23,7 @@ export class StatsPanel {
     this.el = document.createElement('div');
     this.el.className = 'stats-panel';
     container.appendChild(this.el);
+    this._loggedCollectorNote = false;
   }
 
   /** @param {import('../modes/WatchAI.js').WatchAI['stats']} stats */
@@ -36,10 +37,14 @@ export class StatsPanel {
     const optimality = stats.isProvablyOptimal
       ? '<div class="stat-good">✓ bizonyítottan optimális út (megengedhető heurisztika)</div>'
       : '<div class="stat-note">az út nem garantáltan optimális</div>';
-    const collectorNote =
-      stats.goalMode === 'collector'
-        ? '<div class="stat-note">collector: nearest-neighbour kapu-sorrend — NEM optimális (SPEC 5.4)</div>'
-        : '';
+
+    // Fejlesztői infó (nem a fő UI-nak való): a collector-mód nem-optimalitásának oka, csak konzolba, módváltáskor egyszer.
+    if (stats.goalMode === 'collector' && !this._loggedCollectorNote) {
+      console.info('collector: nearest-neighbour kapu-sorrend — NEM optimális (SPEC 5.4)');
+      this._loggedCollectorNote = true;
+    } else if (stats.goalMode !== 'collector') {
+      this._loggedCollectorNote = false;
+    }
 
     this.el.innerHTML = `
       <h3>${stats.algorithm}</h3>
@@ -63,7 +68,6 @@ export class StatsPanel {
       <hr />
       ${row('Gráf csomópont', stats.graphNodes)}
       ${row('Gráf él', stats.graphEdges)}
-      ${collectorNote}
       <div class="legend">
         <span><i style="background:#00e5ff"></i>open</span>
         <span><i style="background:#2b3a67"></i>closed</span>
