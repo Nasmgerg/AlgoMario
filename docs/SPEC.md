@@ -278,7 +278,7 @@ Billentyűzet: `A`/`←` bal, `D`/`→` jobb, `W`/`↑`/`Space` ugrás, `R` rest
 
 ### 8.2. Watch AI
 Algoritmus + célmód + `w` súly kiválasztása. Két fázis:
-1. **Keresés** — a gráf és a bejárás vizualizálva, sebesség-csúszkával (1× … 500× lépés/frame, vagy azonnali)
+1. **Keresés** — a gráf és a bejárás élőben, rögzített ütemben vizualizálva
 2. **Végrehajtás** — a megtalált útvonal lejátszása
 
 ### 8.3. Race Against AI
@@ -321,8 +321,7 @@ src/
   core/
     Rng.js              # mulberry32
     RunState.js         # futásállapot (immutable)
-    step.js             # a lépésfüggvény
-    Rules.js            # végfeltételek, pontszámítás
+    step.js             # a lépésfüggvény + végfeltételek, pontszámítás
     Controller.js       # getAction(state) interfész
   world/
     ChunkCatalog.js
@@ -341,21 +340,39 @@ src/
     PlanExecutor.js
     Metrics.js
   render/
-    GameScene.js        # Phaser
+    GameScene.js        # Play Yourself (Phaser)
+    WatchAIScene.js     # Watch AI (Phaser)
+    RaceScene.js        # Race Against AI (Phaser)
     SearchOverlay.js    # open/closed/útvonal rajzolása
     Sprites.js
+    Audio.js            # háttérzene
   ui/
-    Menu.js  HUD.js  StatsPanel.js  CompareTable.js  Controls.js
+    Landing.js          # kezdőoldal
+    HUD.js
+    StatsPanel.js       # Watch AI statisztika
+    RacePanel.js        # Race eredménypanel
+    BenchmarkPanel.js   # Benchmark táblázat + CSV
+    WatchAIControls.js  # közös vezérlősáv mind a négy módhoz
+    Controls.js         # HumanController (billentyűzet)
   modes/
-    PlayYourself.js  WatchAI.js  RaceAI.js  Benchmark.js
+    PlayYourself.js
+    WatchAI.js
+    AIController.js     # Race precomputed/realtime AI-vezérlők
+    RaceAI.js
+    Benchmark.js
+  workers/
+    benchmark.worker.js
 tests/
   physics.test.js
   generator.test.js
   jumpgraph.test.js
+  execution.test.js
   algorithms.test.js
-  golden.test.js
+  watchai.test.js
+  race.test.js
+  benchmark.test.js
 docs/
-  SPEC.md  ARCHITECTURE.md  ALGORITHMS.md  RESULTS.md
+  SPEC.md  ALGORITHMS.md
 ```
 
 ### 9.3. Controller absztrakció
