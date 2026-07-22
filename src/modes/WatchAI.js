@@ -32,6 +32,9 @@ export const ALGORITHM_CHOICES = Object.freeze([
 /** A terv "célba" szakaszának jelzője (nem konkrét csomópont, hanem a céloszlop). */
 const GOAL_TARGET = -1;
 
+/** DFS iteratív mélyítés (SPEC.md 6.3) mélységi limitenként újraindul, ezért ugyanazt a sekély rétegeket sokszor újrajárja — a többi algoritmusnak megfelelő kiterjesztés/frame mellett ez percekig tartana. A sok újraindítás vizuálisan úgyis alig követhető, ezért ennél a konkrét kombinációnál belső, UI-tól független magas lépésszám fut. */
+const ITERATIVE_DEEPENING_STEPS_PER_FRAME = 2000;
+
 /**
  * @param {string} key @param {number} weight @param {string} dfsVariant
  * @returns {import('../ai/search.js').Algorithm}
@@ -158,7 +161,9 @@ export class WatchAI {
     if (this.phase !== WatchPhase.SEARCHING) return;
     // Budget-őr: NaN/undefined/0 esetén ne "haljon meg" némán az ütemezés —
     // 1 lépés/hívás a biztonságos minimum.
-    const budget = maxSteps === Infinity ? Infinity : Math.max(1, Math.floor(Number(maxSteps) || 1));
+    const requested = maxSteps === Infinity ? Infinity : Math.max(1, Math.floor(Number(maxSteps) || 1));
+    const isIterativeDfs = this.algorithmKey === 'dfs' && this.dfsVariant === DfsVariant.ITERATIVE;
+    const budget = isIterativeDfs ? Math.max(requested, ITERATIVE_DEEPENING_STEPS_PER_FRAME) : requested;
     const startedAt = performance.now();
     if (this._searchWallStart < 0) this._searchWallStart = startedAt;
     this.searchFrames += 1;
