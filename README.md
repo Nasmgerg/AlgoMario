@@ -7,8 +7,12 @@ procedurálisan generált pályán, és a különbség valós
 `nodesExpanded`/`pathCost`/`optimalityRatio` számokban mérhető, CSV-be
 exportálhatóan.
 
-**Élő demó:** https://nasmgerg.github.io/AlgoMario/ *(a GitHub Pages deploy
-után él)*
+Induláskor egy kezdőoldal (`src/ui/Landing.js`) fogadja rövid
+projektismertetővel és egy "Tovább a játékhoz" gombbal, ami a tényleges
+alkalmazásra vált.
+
+<!-- TODO: élő demó link ide, miután a GitHub Pages be van kapcsolva, pl.
+**Élő demó:** https://<felhasznalonev>.github.io/<repo>/ -->
 
 ## Képernyőképek
 
@@ -35,9 +39,8 @@ számokban is látszik (lásd lejjebb a mérési táblázatot). A tervezési dö
   restart), célba érés / leesés / időtúllépés.
 - **Watch AI** — algoritmus + célmód (`speedrun`/`collector`) + Best-First `w`
   súly kiválasztása. Két fázis: a **keresés** élőben festi az open/closed
-  csomópontokat és a végleges utat (1×–500× lépés/frame vagy azonnali), majd a
-  **végrehajtás** lejátssza a talált tervet. DFS-nél kapcsoló a nyers és az
-  iteratív mélyítéses változat között.
+  csomópontokat és a végleges utat, majd a **végrehajtás** lejátssza a talált
+  tervet. DFS-nél kapcsoló a nyers és az iteratív mélyítéses változat között.
 - **Race Against AI** — te és az AI egyszerre indultok ugyanazon a
   pályán/seeden. `precomputed` (az AI előre kiszámolja a teljes tervet) vagy
   `realtime` (az AI-nak tickenként korlátozott ideje van újratervezni, ami
@@ -71,7 +74,7 @@ Részletek: [`docs/SPEC.md`](docs/SPEC.md) 9. szakasz.
 ```bash
 npm install
 npm run dev      # http://localhost:5173 — élő fejlesztői szerver
-npm test         # Vitest — a teljes suite (75+ teszt) Node alatt, Phaser nélkül
+npm test         # Vitest — a teljes suite (76 teszt) Node alatt, Phaser nélkül
 npm run build    # production build a dist/ mappába
 ```
 
