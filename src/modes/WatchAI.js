@@ -1,4 +1,4 @@
-import { buildJumpGraph } from '../ai/JumpGraph.js';
+import { getCachedGraph } from '../ai/graphCache.js';
 import { createSpeedrunProblem, createWaypointProblem, collectorGates } from '../ai/SearchProblem.js';
 import { search, searchIterativeDeepening } from '../ai/search.js';
 import { bfs, dfs, dfsDepthLimited, dijkstra, astar, greedy, bestFirst } from '../ai/algorithms.js';
@@ -68,7 +68,7 @@ export class WatchAI {
     this.dfsVariant = options.dfsVariant ?? DfsVariant.RAW;
     this.maxExpansions = options.maxExpansions ?? 200000;
 
-    this.graph = buildJumpGraph(level);
+    this.graph = getCachedGraph(level);
     this.algorithm = buildAlgorithm(this.algorithmKey, this.weight, this.dfsVariant);
     this.executor = new PlanExecutor(level, this.graph);
 

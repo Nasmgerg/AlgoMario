@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { generateLevel } from '../world/LevelGenerator.js';
+import { getCachedLevel } from '../ai/graphCache.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { WatchAI, WatchPhase } from '../modes/WatchAI.js';
 import { SearchOverlay } from './SearchOverlay.js';
@@ -28,7 +28,7 @@ export class WatchAIScene extends Phaser.Scene {
   }
 
   create() {
-    this.level = generateLevel({
+    this.level = getCachedLevel({
       seed: this.seed,
       length: this.levelLength,
       difficulty: this.difficulty,
@@ -67,6 +67,7 @@ export class WatchAIScene extends Phaser.Scene {
     // Tört sebességekhez (0.25×/0.5× lassított mód): frame-enként gyűlik,
     // és csak egész lépésnyi budget megy a keresőnek.
     this._stepAccumulator = 0;
+    this._lastStatsEmit = 0;
     this._emitStats();
   }
 
@@ -119,7 +120,11 @@ export class WatchAIScene extends Phaser.Scene {
       syncCollectibles(this._executionRunState(), this.sprites);
     }
 
-    this._emitStats();
+    // A statisztikapanel teljes DOM-újraépítés (innerHTML): 60 Hz-en mérhetően terheli a fő szálat (~7% CPU + layout), 10 Hz embernek ugyanolyan élő.
+    if (time - this._lastStatsEmit >= 100) {
+      this._lastStatsEmit = time;
+      this._emitStats();
+    }
   }
 
   /** Simított kamera-követés: teleportálás helyett minden frame-ben a cél felé húz, különben a keresés alatti fókuszváltás vibrálna.

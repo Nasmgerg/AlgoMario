@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { generateLevel } from '../world/LevelGenerator.js';
+import { getCachedLevel } from '../ai/graphCache.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { RaceAI } from '../modes/RaceAI.js';
 import { HumanController } from '../ui/Controls.js';
@@ -27,7 +27,7 @@ export class RaceScene extends Phaser.Scene {
   }
 
   create() {
-    this.level = generateLevel({
+    this.level = getCachedLevel({
       seed: this.seed,
       length: this.levelLength,
       difficulty: this.difficulty,
@@ -70,6 +70,7 @@ export class RaceScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
 
     this.accumulatorMs = 0;
+    this._lastStatsEmit = 0;
     this._syncSprites();
     this.onStats(this.race.stats);
   }
@@ -95,7 +96,11 @@ export class RaceScene extends Phaser.Scene {
     }
     syncCollectibles(this.race.playerState, this.sprites);
     this._syncSprites();
-    this.onStats(this.race.stats);
+    // Az eredménypanel teljes DOM-újraépítés (innerHTML): 60 Hz-en mérhetően terheli a fő szálat, 10 Hz embernek ugyanolyan élő.
+    if (time - this._lastStatsEmit >= 100) {
+      this._lastStatsEmit = time;
+      this.onStats(this.race.stats);
+    }
   }
 
   _syncSprites() {

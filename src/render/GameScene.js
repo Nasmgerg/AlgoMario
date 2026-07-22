@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { generateLevel } from '../world/LevelGenerator.js';
+import { getCachedLevel } from '../ai/graphCache.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { PHYSICS } from '../config/physics.js';
 import { PlayYourself } from '../modes/PlayYourself.js';
@@ -29,7 +29,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.level = generateLevel({ seed: this.seed, length: this.length, difficulty: this.difficulty });
+    this.level = getCachedLevel({ seed: this.seed, length: this.length, difficulty: this.difficulty });
     this.session = new PlayYourself(this.level, new HumanController(this.input.keyboard));
     this.accumulatorMs = 0;
     startBackgroundMusic(this);

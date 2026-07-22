@@ -1,6 +1,6 @@
 import { createInitialRunState, RunStatus } from '../core/RunState.js';
 import { step, Action } from '../core/step.js';
-import { buildJumpGraph } from '../ai/JumpGraph.js';
+import { getCachedGraph } from '../ai/graphCache.js';
 import { bfs, dfs, dijkstra, astar, greedy, bestFirst } from '../ai/algorithms.js';
 import { PrecomputedAIController, RealtimeAIController } from './AIController.js';
 
@@ -43,7 +43,7 @@ export class RaceAI {
     this.weight = options.weight ?? 1;
     this.handicapTicks = Math.max(0, options.handicapTicks ?? 0);
 
-    this.graph = buildJumpGraph(level);
+    this.graph = getCachedGraph(level);
     const algorithm = algorithmByKey(this.algorithmKey, this.weight);
     this.algorithmName = algorithm.name;
 
