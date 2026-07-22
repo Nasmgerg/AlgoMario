@@ -1,15 +1,15 @@
 # Algoritmusok
 
 Ez a dokumentum a hat útkereső algoritmust, a Best-First `w`-paraméteres
-keretrendszert, és a tervezési döntésnaplót foglalja össze olvasóbarát
-formában. A teljes funkcionális specifikáció: [`SPEC.md`](SPEC.md) (5–6.
+keretrendszert és a tervezési döntésnaplót foglalja össze. A teljes
+funkcionális specifikáció: [`SPEC.md`](SPEC.md) (5–6.
 szakasz a keresésről, 15. szakasz a döntésnapló forrása).
 
 ## A közös váz
 
 Mind a hat algoritmus **ugyanazon a generátoros keresési vázon**
 (`src/ai/search.js`) fut, egy pályánként egyszer felépített makró-gráfon
-(`JumpGraph` — csomópont minden állható cellán, él a `JumpTable`
+(`JumpGraph`: csomópont minden állható cellán, él a `JumpTable`
 előszámított mozdulat-menüje alapján, súly = tick). Az algoritmusokat
 kizárólag három dolog különbözteti meg (`src/ai/algorithms.js`):
 
@@ -36,17 +36,17 @@ hanem egyetlen kód három paraméterének hat konfigurációja.
 ## A Best-First `w`-paraméteres keretrendszer
 
 A `bestFirst(w)` (`src/ai/algorithms.js`) a `f(n) = g(n) + w·h(n)`
-prioritásfüggvényt használja. Ennek két szélsőértéke kód szinten esik egybe
-a másik kettővel, nem csak koncepcionálisan:
+prioritásfüggvényt használja. Ennek két szélsőértéke a kódban is pontosan
+egybeesik a másik kettővel:
 
 - `w = 0` → `f(n) = g(n)` → pontosan a Dijkstra prioritása.
 - `w = 1` → `f(n) = g(n) + h(n)` → pontosan az A\* prioritása.
 - `w → ∞` → a `g` tag elhanyagolhatóvá válik → a Greedy-hez tart.
 
-A `tests/algorithms.test.js` ezt a *kiterjesztési sorrend* szintjén is
-ellenőrzi, nem csak a talált útköltség alapján: `bestFirst(0)` és a
-`dijkstra` minden vizsgált seeden bit-azonos sorrendben terjeszt ki
-csomópontokat, ugyanígy `bestFirst(1)` és az `astar`.
+A `tests/algorithms.test.js` a *kiterjesztési sorrendet* is ellenőrzi:
+`bestFirst(0)` és a `dijkstra` minden vizsgált seeden bit-azonos
+sorrendben terjeszt ki csomópontokat, ugyanígy `bestFirst(1)` és az
+`astar`.
 
 ### A heurisztika (`src/ai/Heuristics.js`)
 
@@ -59,7 +59,7 @@ sebessége ±0,2-re van clampelve, ezért semelyik él nem visz gyorsabban egy
 oszloppal odébb, mint `1 / MAX_RUN_SPEED = 5` tick. A heurisztika emiatt
 *megengedhető* (sosem becsül túl) és *konzisztens* (élenkénti csökkenése
 sosem haladja meg az él költségét). Ez adja az A\* optimalitásának formális
-alapját, nem csak a mérési eredményt.
+alapját.
 
 ## DFS: nyers vs. iteratív mélyítés
 
@@ -86,7 +86,7 @@ pontokon változott, indoklással:
 
 | Változás | Indok |
 |---|---|
-| Pályaméret 13×100 → konfigurálható (alap 16×250) | A 100 oszlop túl rövid ahhoz, hogy az algoritmusok között látható különbség alakuljon ki. A jump-graph 500 oszlopnál is csak pár ezer csomópont — bőven elbírja. |
+| Pályaméret 13×100 → konfigurálható (alap 16×250) | A 100 oszlop túl rövid ahhoz, hogy az algoritmusok között látható különbség alakuljon ki. A jump-graph 500 oszlopnál is csak pár ezer csomópontból áll, ez nem korlátozza a keresés méretét. |
 | Iterációlimit 1 000 → 10 000 (`length × 40`) | 250 oszlop bejárása minimum 1 250 tick; 1 000 tick már a start után megölné a futást. |
 | Phaser fizika kivéve | Delta-időfüggő → gépenként más eredmény → a seed-reprodukálhatóság, a race és a replay elromlana. |
 | Best-First mint `g + w·h` keretrendszer | Így nem esik egybe a Greedy-vel, és láthatóvá teszi, hogy a másik három ennek speciális esete. |
@@ -103,11 +103,12 @@ szereplő tervezési tanulság is felmerült. Mindkettő a
 `JumpGraph`/`JumpTable` implementációjában van orvosolva:
 
 - **Egy `(dRow, dCol)` kulcshoz több, eltérő röppályájú jelöltet kell
-  tárolni**, nem csak a legolcsóbbat. Egy adott terepen a legolcsóbb ívet a
-  domborzat blokkolhatja, míg egy drágább, de más időzítésű ív szabadon
-  átér. Enélkül léteztek olyan generált pályák, amik a world-validátor
-  szerint járhatók voltak, de az AI számára megoldhatatlanok.
-- **Az élek "horgony"-fázissal záródnak**: a landolás után egy rövid,
+  tárolni**: a legolcsóbb önmagában nem elég. Egy adott terepen a
+  legolcsóbb ívet a domborzat blokkolhatja, míg egy drágább, de más
+  időzítésű ív szabadon átér. Enélkül léteztek olyan generált pályák,
+  amik a world-validátor szerint járhatók voltak, de az AI számára
+  megoldhatatlanok.
+- **Az élek *horgony*-fázissal záródnak**: a landolás után egy rövid,
   valódi terepen tuningolt korrekciós szakasz PONTOSAN a célcsomópont
   egész-cella állapotára állítja Máriót. Enélkül a tervek csomópontonkénti
   újrahorgonyzás nélkül, folytonosan lejátszva lebegőpontos zajból
