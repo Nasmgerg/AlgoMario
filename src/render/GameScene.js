@@ -18,7 +18,7 @@ export class GameScene extends Phaser.Scene {
 
   /** @param {{seed?: number, length?: number, difficulty?: number}} data */
   init(data) {
-    this.seed = Number.isInteger(data?.seed) ? data.seed : 1;
+    this.seed = data?.seed;
     this.length = data?.length ?? LENGTH_PRESETS.normal;
     this.difficulty = data?.difficulty ?? 1;
   }

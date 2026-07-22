@@ -1,5 +1,6 @@
 import { ALGORITHM_CHOICES, GoalMode, DfsVariant } from '../modes/WatchAI.js';
 import { RaceSubmode } from '../modes/RaceAI.js';
+import { resolveSeed } from '../config/seed.js';
 
 /** Watch AI vezérlők (SPEC.md 8.2, 6.3, M4): algoritmus/célmód-választás, `w` súly és DFS-variáns; DOM-alapú, mint minden `ui/` modul. */
 
@@ -86,6 +87,10 @@ export class WatchAIControls {
     this.seedInput.className = 'ctl-seed';
     this.seedInput.addEventListener('change', () => this.restart());
 
+    // Érvénytelen seednél a ténylegesen használt (véletlen) seedet írja ki (SPEC.md 12).
+    this.seedStatus = document.createElement('span');
+    this.seedStatus.className = 'ctl-seed-status';
+
     // --- Race (SPEC.md 8.3) ---
     this.raceSubmodeSelect = this._select([
       { key: RaceSubmode.PRECOMPUTED, label: 'precomputed (teljes terv)' },
@@ -134,7 +139,7 @@ export class WatchAIControls {
     this.dfsField = field('DFS változat', this.dfsSelect);
     this.goalField = field('Célmód', this.goalSelect);
     this.algorithmField = field('Algoritmus', this.algorithmSelect);
-    this.seedField = field('Seed', this.seedInput);
+    this.seedField = field('Seed', this._withValue(this.seedInput, this.seedStatus));
     this.raceSubmodeField = field('Race almód', this.raceSubmodeSelect);
     this.budgetField = field('AI tick-budget', this._withValue(this.budgetInput, this.budgetValue));
     this.handicapField = field('AI handicap', this._withValue(this.handicapInput, this.handicapValue));
@@ -233,10 +238,11 @@ export class WatchAIControls {
     return STEPS_PER_FRAME;
   }
 
-  /** @returns {number} a kiválasztott seed */
+  /** @returns {number} a ténylegesen használt seed (érvénytelen mezőértéknél véletlen fallback, SPEC.md 12) */
   get seed() {
-    const value = Number(this.seedInput.value);
-    return Number.isFinite(value) ? value : 5;
+    const { seed, isFallback } = resolveSeed(Number(this.seedInput.value));
+    this.seedStatus.textContent = isFallback ? `érvénytelen — tényleges seed: ${seed}` : '';
+    return seed;
   }
 
   /** @returns {{algorithm: string, weight: number, goalMode: string, dfsVariant: string, seed: number}} */

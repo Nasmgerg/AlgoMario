@@ -15,7 +15,7 @@ export class WatchAIScene extends Phaser.Scene {
 
   /** @param {{seed?: number, length?: number, difficulty?: number, watchConfig?: object, getStepsPerFrame?: () => number, onStats?: (stats: object) => void}} data */
   init(data) {
-    this.seed = Number.isInteger(data?.seed) ? data.seed : 5;
+    this.seed = data?.seed;
     this.levelLength = data?.length ?? LENGTH_PRESETS.normal;
     this.difficulty = data?.difficulty ?? 2;
     this.watchConfig = data?.watchConfig ?? {};
