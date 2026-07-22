@@ -40,20 +40,26 @@ export class Landing {
   constructor(container, handlers) {
     this.el = container;
 
-    const modeTiles = MODES.map((m) => `<div class="mode-tile"><b>${m.name}</b><span>${m.text}</span></div>`).join(
-      '',
-    );
+    const tile = (m) => `<div class="mode-tile"><b>${m.name}</b><span>${m.text}</span></div>`;
+    const leftTiles = MODES.slice(0, 2).map(tile).join('');
+    const rightTiles = MODES.slice(2).map(tile).join('');
 
     this.el.innerHTML = `
       <pre class="landing-banner">${BANNER}</pre>
-      <pre class="landing-level">${renderLevelSnippet(LEVEL_SNIPPET_ROWS)}</pre>
-      <p class="landing-legend">
-        <span class="tile-wall">#</span> talaj ·
-        <span class="tile-pipe">P</span> cső ·
-        <span class="tile-surprise">?</span> surprise ·
-        <span class="tile-coin">o</span> érme ·
-        <span class="tile-goal">!</span> cél
-      </p>
+      <div class="landing-showcase">
+        <div class="mode-col mode-col-left">${leftTiles}</div>
+        <div class="landing-level-wrap">
+          <pre class="landing-level">${renderLevelSnippet(LEVEL_SNIPPET_ROWS)}</pre>
+          <p class="landing-legend">
+            <span class="tile-wall">#</span> talaj ·
+            <span class="tile-pipe">P</span> cső ·
+            <span class="tile-surprise">?</span> surprise ·
+            <span class="tile-coin">o</span> érme ·
+            <span class="tile-goal">!</span> cél
+          </p>
+        </div>
+        <div class="mode-col mode-col-right">${rightTiles}</div>
+      </div>
       <p class="landing-intro">
         2D-s, Mario-szerű platformjáték: ugyanazzal a seeddel mindig ugyanaz
         a pálya, és hatféle útkereső algoritmus (<b>BFS</b>, <b>DFS</b>,
@@ -61,7 +67,6 @@ export class Landing {
         <b>Best-First</b>) viszi végig rajta magát. Végignézheted élőben,
         ahogy keresnek, vagy kiméred őket egymás ellen számokban.
       </p>
-      <div class="landing-modes">${modeTiles}</div>
       <button type="button" class="landing-continue">Tovább a játékhoz</button>
     `;
 
