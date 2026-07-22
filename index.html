@@ -245,10 +245,74 @@
         text-transform: uppercase;
         letter-spacing: 0.04em;
       }
+      /* --- Kezdőoldal --- */
+      #landing {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        padding: 24px 16px;
+        box-sizing: border-box;
+        text-align: center;
+      }
+      .landing-banner {
+        margin: 0;
+        color: #f85149;
+        font-size: clamp(6px, 1.6vw, 13px);
+        line-height: 1.15;
+        text-shadow: 0 0 12px rgba(248, 81, 73, 0.35);
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      .landing-divider {
+        margin: 0;
+        color: #ffd400;
+        font-size: 14px;
+        letter-spacing: 0.1em;
+      }
+      .landing-intro {
+        max-width: 620px;
+        margin: 0;
+        color: #e6edf3;
+        line-height: 1.6;
+        font-size: 15px;
+      }
+      .landing-modes {
+        max-width: 560px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        text-align: left;
+        color: #8b949e;
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .landing-modes b {
+        color: #79c0ff;
+      }
+      .landing-continue {
+        margin-top: 8px;
+        padding: 12px 28px;
+        font-size: 15px;
+        font-weight: bold;
+        color: #7ee787;
+        background: #1b4721;
+        border: 1px solid #2ea043;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .landing-continue:hover {
+        background: #22582a;
+      }
     </style>
   </head>
   <body>
-    <div id="app">
+    <div id="landing"></div>
+    <div id="app" style="display: none">
       <div id="game-container"></div>
       <aside id="sidebar"></aside>
     </div>
