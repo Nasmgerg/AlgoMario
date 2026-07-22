@@ -46,5 +46,8 @@ export function isMusicEnabled() {
  */
 export function setMusicEnabled(enabled) {
   musicEnabled = enabled;
-  for (const track of activeTracks) track.setMute(!enabled);
+  for (const track of activeTracks) {
+    // A setMute a konkrét sound-osztályokon él (WebAudio/HTML5Audio), a BaseSound típusán nem — futásidőben mindig ott van.
+    /** @type {import('phaser').Sound.WebAudioSound} */ (track).setMute(!enabled);
+  }
 }

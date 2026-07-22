@@ -70,6 +70,18 @@ export class Landing {
       <button type="button" class="landing-continue">Tovább a játékhoz</button>
     `;
 
-    this.el.querySelector('.landing-continue').addEventListener('click', () => handlers.onContinue());
+    const button = /** @type {HTMLButtonElement} */ (this.el.querySelector('.landing-continue'));
+    button.addEventListener('click', async () => {
+      // Az onContinue dinamikus importot vár be (lassú hálózaton érzékelhető), ezért a gomb jelzi az állapotot, és hiba esetén újrapróbálható marad.
+      button.disabled = true;
+      button.textContent = 'Betöltés…';
+      try {
+        await handlers.onContinue();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = 'Hiba történt — próbáld újra';
+        console.error('Az alkalmazás betöltése nem sikerült:', error);
+      }
+    });
   }
 }
