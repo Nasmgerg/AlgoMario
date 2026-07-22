@@ -1,10 +1,10 @@
 import { ALGORITHM_CHOICES, GoalMode, DfsVariant } from '../modes/WatchAI.js';
 import { RaceSubmode } from '../modes/RaceAI.js';
 
-/** Watch AI vezérlők (SPEC.md 8.2, 6.3, M4): algoritmus/célmód-választás, `w` súly, sebesség és DFS-variáns; DOM-alapú, mint minden `ui/` modul. */
+/** Watch AI vezérlők (SPEC.md 8.2, 6.3, M4): algoritmus/célmód-választás, `w` súly és DFS-variáns; DOM-alapú, mint minden `ui/` modul. */
 
-/** A sebesség-csúszka fokozatai: kiterjesztés/frame (SPEC.md 8.2); 1 alatt a scene több frame-enként enged egy lépést (0.25× = 1 lépés/4 frame), Infinity = azonnali. */
-export const SPEED_STEPS = Object.freeze([0.25, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500, Infinity]);
+/** Rögzített keresés-sebesség: kiterjesztés/frame (SPEC.md 8.2, korábban csúszkával állítható). */
+const STEPS_PER_FRAME = 2;
 
 /** A realtime AI tick-budget fokozatai ms-ban (SPEC.md 8.3). */
 export const BUDGET_STEPS = Object.freeze([0.05, 0.1, 0.2, 0.5, 1, 2, 5, 16]);
@@ -66,14 +66,6 @@ export class WatchAIControls {
     ]);
     this.dfsSelect.addEventListener('change', () => this.restart());
 
-    // Alapérték: 2×/frame — az alap pályán is másodpercekig látható a bejárás.
-    this.speedInput = this._range(0, SPEED_STEPS.length - 1, 1, SPEED_STEPS.indexOf(2));
-    this.speedInput.addEventListener('input', () => {
-      this.speedValue.textContent = this._speedLabel();
-    });
-    this.speedValue = document.createElement('b');
-    this.speedValue.textContent = this._speedLabel();
-
     this.seedInput = document.createElement('input');
     this.seedInput.type = 'number';
     this.seedInput.value = '5';
@@ -127,7 +119,6 @@ export class WatchAIControls {
     this.weightField = field('Best-First w', this._withValue(this.weightInput, this.weightValue));
     this.dfsField = field('DFS változat', this.dfsSelect);
     this.goalField = field('Célmód', this.goalSelect);
-    this.speedField = field('Sebesség', this._withValue(this.speedInput, this.speedValue));
     this.algorithmField = field('Algoritmus', this.algorithmSelect);
     this.seedField = field('Seed', this.seedInput);
     this.raceSubmodeField = field('Race almód', this.raceSubmodeSelect);
@@ -142,7 +133,6 @@ export class WatchAIControls {
       this.weightField,
       this.dfsField,
       this.goalField,
-      this.speedField,
       this.raceSubmodeField,
       this.budgetField,
       this.handicapField,
@@ -192,13 +182,6 @@ export class WatchAIControls {
     return `w=${w} (weighted A*)`;
   }
 
-  _speedLabel() {
-    const speed = SPEED_STEPS[Number(this.speedInput.value)];
-    if (speed === Infinity) return 'azonnali';
-    if (speed < 1) return `${speed}× (lassított)`;
-    return `${speed}× lépés/frame`;
-  }
-
   _budgetLabel() {
     const ms = BUDGET_STEPS[Number(this.budgetInput.value)];
     return ms >= 16 ? `${ms} ms (bő)` : `${ms} ms/tick`;
@@ -221,7 +204,6 @@ export class WatchAIControls {
     // változatot futtatja — az iteratív mélyítés újratervezésenként újraindulna).
     show(this.dfsField, mode === 'watch' && this.algorithmSelect.value === 'dfs');
     show(this.goalField, mode === 'watch');
-    show(this.speedField, mode === 'watch');
     show(this.raceSubmodeField, mode === 'race');
     show(this.budgetField, mode === 'race' && this.raceSubmodeSelect.value === RaceSubmode.REALTIME);
     show(this.handicapField, mode === 'race');
@@ -231,9 +213,9 @@ export class WatchAIControls {
     this.restartField.style.display = mode === 'benchmark' ? 'none' : '';
   }
 
-  /** @returns {number} lépés/frame (Infinity = azonnali) */
+  /** @returns {number} lépés/frame (a sebesség-csúszka eltávolítása után rögzített érték) */
   get stepsPerFrame() {
-    return SPEED_STEPS[Number(this.speedInput.value)];
+    return STEPS_PER_FRAME;
   }
 
   /** @returns {number} a kiválasztott seed */
