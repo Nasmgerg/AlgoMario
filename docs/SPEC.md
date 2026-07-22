@@ -1,6 +1,5 @@
-# Webes platformjáték AI útkeresőkkel — Specifikáció v2
+# Webes platformjáték AI útkeresőkkel — Specifikáció
 
-> Ez a v1 spec javított változata. A változtatások indoklása a **Döntésnapló** szekcióban.
 > Kontextus: **saját side project**, cél a tanulás, a hat útkereső algoritmus összehasonlítása és egy publikálható portfólió-darab.
 
 ---
@@ -13,19 +12,19 @@ A régi Java beadandó (`MarioGame` / `MarioState` / `Agent`) **logikai referenc
 
 ---
 
-## 2. Rögzített döntések (v2)
+## 2. Rögzített döntések
 
 | # | Téma | Döntés |
 |---|---|---|
 | D1 | Pályaméret | Konfigurálható. Alap: **16 sor × 250 oszlop**. Presetek: short 120 / normal 250 / long 500. |
 | D2 | Tick-limit | `maxTicks = length × 40`, alapértelmezésben **10 000**. |
-| D3 | Fizika | **Saját, fixed-timestep szimuláció.** Phaser Arcade Physics **nincs használva**. |
+| D3 | Fizika | **Saját, fixed-timestep szimuláció.** Phaser Arcade Physics **nincs használva** — a delta-idő-függő fizika gépenként eltérő eredményt adna, ami a determinizmust, a race módot és a replay-t is elrontaná. |
 | D4 | Algoritmusok | Mind a hat marad. A Best-First **paraméterezhető keretrendszerként** kerül be (lásd 6.2). |
 | D5 | Keresési tér | Kétszintű: **jump-graph** (makró, itt fut a keresés) + **forward model** (mikró, végrehajtás). |
 | D6 | Élsúly | **Tick-szám (pozitív).** Két célmód: `speedrun` és `collector`. |
 | D7 | Mobil | **Kikerül** a követelmények közül. Reszponzív layout igen, touch-vezérlés nem. |
 | D8 | Determinizmus | Saját seedelt PRNG (mulberry32). `Math.random()` tilos. |
-| D9 | Keresés futtatása | **Generátor függvények** (`function*`), frame-enként időszeletelve. Worker csak batch-benchmarkhoz. |
+| D9 | Keresés futtatása | **Generátor függvények** (`function*`), frame-enként időszeletelve — nem blokkolja a UI-t, lépésenként vizualizálható és bármikor leállítható. Worker csak batch-benchmarkhoz. |
 | D10 | Metrikák | Memóriamérés helyett **peak open-list / closed méret / generált és kiterjesztett csomópontok**. |
 
 ---
@@ -36,7 +35,7 @@ A régi Java beadandó (`MarioGame` / `MarioState` / `Agent`) **logikai referenc
 
 - Rács, `height × length` cellák. Alap: 16 × 250.
 - Cellatípusok: `EMPTY`, `WALL`, `PIPE`, `SURPRISE`, `COIN`, `GOAL`.
-- Mario mérete: **1×1 cella** (v1-ben nem változik, mint a Java modellben).
+- Mario mérete: **1×1 cella**, mint a Java modellben.
 - A pálya **immutable** a futás alatt. A begyűjtött érmék / kiütött surprise-ok a *futásállapotban* vannak nyilvántartva (Set), nem a mapban. Ez a legfontosabb eltérés a Java verziótól, ahol a `map` mutálódott.
 
 ### 3.2. Fizika
@@ -163,7 +162,7 @@ Tartomány: `dRow ∈ [-5, +8]`, `dCol ∈ [1, 7]` → ~100 bejegyzés. Futásid
 
 ### 5.3. JumpGraph (pályánként egyszer)
 
-- **Csomópont**: minden olyan cella, amin Mario állhat (talaj- vagy platformtető) → tipikusan 300–800 csomópont egy 250 oszlopos pályán.
+- **Csomópont**: minden olyan cella, amin Mario állhat (talaj- vagy platformtető) → tipikusan 300–800 csomópont egy 250 oszlopos pályán, 500 oszlopnál is csak pár ezer — a keresés méretét ez nem korlátozza.
 - **Él**: `from → to`, ha a JumpTable szerint a mozgás végrehajtható **és** a röppálya nem ütközik semmibe (sugárkövetés a szimulált pozíciókon).
 - **Élsúly**: a mozgás tick-száma (pozitív egész).
 - **Él-metaadat**: az útvonalon érintett érmék listája.
@@ -232,7 +231,7 @@ export function* search(problem, frontier, options) { ... }
 | **Greedy Best-First** | min-heap | `h` | Gyors, gyakran rossz utat ad |
 | **Best-First** | min-heap | `g + w·h` | **Paraméterezhető keretrendszer**, `w` csúszkával 0–10 |
 
-**A Best-First megkülönböztetése:** a v1 specben a Best-First és a Greedy Best-First ugyanaz lett volna. A megoldás az, hogy a Best-First a *keretrendszer* szerepét kapja, `w` súllyal:
+**A Best-First megkülönböztetése:** a Best-First a *keretrendszer* szerepét kapja, `w` súllyal — enélkül ugyanaz lenne, mint a Greedy Best-First:
 
 - `w = 0` → Dijkstra
 - `w = 1` → A\*
@@ -451,24 +450,10 @@ README mérési eredményekkel, `docs/ALGORITHMS.md`, GitHub Actions deploy, GIF
 
 ---
 
-## 15. Döntésnapló (mi változott a v1-hez képest és miért)
+## 15. Lehetséges jövőbeli bővítések
 
-| Változás | Indok |
-|---|---|
-| Pályaméret 13×100 → konfigurálható (alap 16×250) | A 100 oszlop túl rövid ahhoz, hogy az algoritmusok között látható különbség alakuljon ki. A jump-graph 500 oszlopnál is csak pár ezer csomópont — bőven elbírja. |
-| Iterációlimit 1 000 → 10 000 (`length × 40`) | 250 oszlop bejárása minimum 1 250 tick; 1 000 tick már a start után megölné a futást. |
-| Phaser fizika kivéve | Delta-időfüggő → gépenként más eredmény → a seed-reprodukálhatóság, a race és a replay elromlana. |
-| Best-First mint `g + w·h` keretrendszer | Így nem esik egybe a Greedy-vel, és láthatóvá teszi, hogy a másik három ennek speciális esete. |
-| Élsúly = tick, jutalom külön célmódban | Negatív élsúllyal a Dijkstra és az A\* garanciái megszűnnének. Így marad egy valódi optimum-referencia. |
-| Kétszintű keresési tér | Folytonos állapottéren a BFS és a Dijkstra azonos lenne; a mérés semmit nem mondana. |
-| Memóriametrika → open/closed méret | A `performance.memory` böngészőben nem megbízható. |
-| Mobil kikerült | Side project, nem indokolja a plusz munkát. |
-| Generátoros keresők | Egy megoldással három probléma: nem blokkol, lépésenként vizualizálható, leállítható. |
+Nem részei a jelenlegi specifikációnak, de a jövőben megfontolandók:
 
----
-
-## 16. Nyitott, később eldöntendő kérdések
-
-1. **Változó ugrásmagasság** — jobb game feel, de +1 akció a keresésben. Halasztva M5 utánra.
+1. **Változó ugrásmagasság** — jobb game feel, de +1 akció a keresésben, ami minden algoritmust és a `JumpTable`-t is érintené.
 2. **Ellenfelek (Goomba-szerű)** — dinamikus akadály, ami időfüggővé teszi a keresést. Ez már egy másik projekt (időbővített állapottér), de érdekes bővítés.
 3. **Napi challenge** — a dátumból származtatott seed, eredmény `localStorage`-ben. Olcsó és jól mutat.

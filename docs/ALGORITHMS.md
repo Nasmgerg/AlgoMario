@@ -79,7 +79,7 @@ soha nem lép mélyebbre a szükségesnél. Ennek ára itt ~350× annyi
 kiterjesztés, mint a nyers DFS-nek. Ez a klasszikus tér–idő csereviszony,
 élesben, ugyanazon a pályán mérve.
 
-## Döntésnapló (SPEC.md 15. szakasz)
+## Döntésnapló
 
 A projekt egy korábbi (Java) referenciaverzióhoz képest a következő
 pontokon változott, indoklással:
