@@ -16,15 +16,17 @@ alkalmazásra vált.
 
 ## Képernyőképek
 
-*(a képek még hiányoznak, böngészős screenshotolás után kerülnek ide)*
+| Kezdőoldal |
+|---|
+| ![Kezdőoldal](docs/screenshots/welcome.png) |
 
 | Play Yourself | Watch AI (keresés vizualizáció) |
 |---|---|
-| `docs/screenshots/play-yourself.png` | `docs/screenshots/watch-ai-search.png` |
+| ![Play Yourself](docs/screenshots/playyourself.png) | ![Watch AI](docs/screenshots/watchai.png) |
 
 | Race Against AI | Benchmark (mérési táblázat) |
 |---|---|
-| `docs/screenshots/race.png` | `docs/screenshots/benchmark.png` |
+| ![Race Against AI](docs/screenshots/raceagaintsai.png) | ![Benchmark](docs/screenshots/bechmark.png) |
 
 ## Miért készült
 
