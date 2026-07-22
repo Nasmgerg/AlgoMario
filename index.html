@@ -41,6 +41,28 @@
       #game-container[style*='none'] + #sidebar {
         flex: 1 1 auto;
       }
+      /* Keskeny (telefon) nézet: a 300px-es sidebar vízszintesen a viewport
+         nagy részét elvinné, a canvas vékony csíkra szorulna. Ezért
+         függőleges elrendezés: canvas felül fix magasságon, a statisztika
+         alatta görgethetően. */
+      @media (max-width: 700px) {
+        #app {
+          flex-direction: column;
+        }
+        #game-container {
+          flex: 0 0 55vh;
+          width: 100%;
+          height: 55vh;
+        }
+        #sidebar {
+          flex: 1 1 auto;
+          width: 100%;
+          height: auto;
+          min-height: 0;
+          border-left: none;
+          border-top: 1px solid #30363d;
+        }
+      }
       .controls {
         display: flex;
         flex-direction: column;
