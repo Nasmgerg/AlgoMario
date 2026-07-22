@@ -31,6 +31,14 @@ export class WatchAIControls {
     this.el.className = 'controls';
     container.appendChild(this.el);
 
+    // Vezérlő-használat után a fókusz nem maradhat a form-elemen: a játékbillentyűk különben a fókuszált selectet vezérelnék (type-ahead: az R a "Race Against AI"-ra ugrana restart helyett).
+    this.el.addEventListener('change', (event) => {
+      if (event.target instanceof HTMLElement) event.target.blur();
+    });
+    this.el.addEventListener('click', (event) => {
+      if (event.target instanceof HTMLButtonElement) event.target.blur();
+    });
+
     // Globális, mód-független kapcsoló — minden scene ugyanazt a háttérzenét indítja (render/Audio.js).
     this.musicToggle = document.createElement('input');
     this.musicToggle.type = 'checkbox';

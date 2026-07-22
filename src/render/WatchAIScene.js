@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getCachedLevel } from '../ai/graphCache.js';
+import { isTypingIntoForm } from '../ui/Controls.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { WatchAI, WatchPhase } from '../modes/WatchAI.js';
 import { SearchOverlay } from './SearchOverlay.js';
@@ -56,6 +57,10 @@ export class WatchAIScene extends Phaser.Scene {
     const onResize = () => this._applyZoom();
     this.scale.on('resize', onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', onResize));
+
+    this.input.keyboard.on('keydown-R', () => {
+      if (!isTypingIntoForm()) this.scene.restart();
+    });
 
     this._pathShown = false;
     // Lejátszás-állapot a tick-pontos érme-elrejtéshez — újraindításkor

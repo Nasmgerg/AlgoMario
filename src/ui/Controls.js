@@ -5,6 +5,16 @@ const LEFT_KEYS = ['LEFT', 'A'];
 const RIGHT_KEYS = ['RIGHT', 'D'];
 const JUMP_KEYS = ['UP', 'W', 'SPACE'];
 
+/** Igaz, ha a fókusz űrlapmezőn van (pl. a seed-mezőbe gépel a felhasználó) — ilyenkor a játékbillentyűk (mozgás, R restart) nem érvényesek, mert a leütés az űrlapnak szól.
+ * @returns {boolean}
+ */
+export function isTypingIntoForm() {
+  const el = document.activeElement;
+  return (
+    el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement
+  );
+}
+
 /** Billentyűzetes `Controller` (SPEC.md 8.1: A/←, D/→, W/↑/Space); a Phaser keyboard pluginra épül, ezért csak itt élhet, a core/ marad Phaser-mentes. */
 export class HumanController extends Controller {
   /** @param {Phaser.Input.Keyboard.KeyboardPlugin} keyboard */
@@ -23,6 +33,7 @@ export class HumanController extends Controller {
    * @returns {number} - {@link Action}
    */
   getAction(state) {
+    if (isTypingIntoForm()) return Action.NONE;
     const jumpHeld = this._isAnyDown(JUMP_KEYS);
     if (jumpHeld && state.grounded) return Action.JUMP;
 

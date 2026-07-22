@@ -3,7 +3,7 @@ import { getCachedLevel } from '../ai/graphCache.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { PHYSICS } from '../config/physics.js';
 import { PlayYourself } from '../modes/PlayYourself.js';
-import { HumanController } from '../ui/Controls.js';
+import { HumanController, isTypingIntoForm } from '../ui/Controls.js';
 import { HUD } from '../ui/HUD.js';
 import { preloadSprites, buildLevelSprites, syncCollectibles, CELL_SIZE } from './Sprites.js';
 import { preloadAudio, startBackgroundMusic } from './Audio.js';
@@ -59,7 +59,9 @@ export class GameScene extends Phaser.Scene {
     this.uiCamera.ignore(worldObjects);
     this.cameras.main.ignore(this.hud.getGameObjects());
 
-    this.input.keyboard.on('keydown-R', () => this.restart());
+    this.input.keyboard.on('keydown-R', () => {
+      if (!isTypingIntoForm()) this.restart();
+    });
 
     // Kezdeti elrendezés + minden átméretezéskor újra (Scale.RESIZE nem igazítja a kamerákat automatikusan); a listener leállításkor lekerül.
     this._applyResponsiveLayout(this.scale.width, this.scale.height);

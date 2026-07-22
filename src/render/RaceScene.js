@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getCachedLevel } from '../ai/graphCache.js';
 import { LENGTH_PRESETS } from '../config/difficulty.js';
 import { RaceAI } from '../modes/RaceAI.js';
-import { HumanController } from '../ui/Controls.js';
+import { HumanController, isTypingIntoForm } from '../ui/Controls.js';
 import { preloadSprites, buildLevelSprites, syncCollectibles, CELL_SIZE } from './Sprites.js';
 import { preloadAudio, startBackgroundMusic } from './Audio.js';
 
@@ -67,7 +67,9 @@ export class RaceScene extends Phaser.Scene {
     this.scale.on('resize', onResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', onResize));
 
-    this.input.keyboard.on('keydown-R', () => this.scene.restart());
+    this.input.keyboard.on('keydown-R', () => {
+      if (!isTypingIntoForm()) this.scene.restart();
+    });
 
     this.accumulatorMs = 0;
     this._lastStatsEmit = 0;
