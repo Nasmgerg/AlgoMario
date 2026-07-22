@@ -6,6 +6,7 @@ import { WatchAIControls } from './ui/WatchAIControls.js';
 import { StatsPanel } from './ui/StatsPanel.js';
 import { RacePanel } from './ui/RacePanel.js';
 import { BenchmarkPanel } from './ui/BenchmarkPanel.js';
+import { setMusicEnabled } from './render/Audio.js';
 
 const sidebar = document.getElementById('sidebar');
 const gameContainer = document.getElementById('game-container');
@@ -109,6 +110,7 @@ controls = new WatchAIControls(sidebar, {
     applyMode();
   },
   onRunBenchmark: (benchmarkConfig) => benchmarkPanel.run(benchmarkConfig),
+  onToggleMusic: (enabled) => setMusicEnabled(enabled),
 });
 
 sidebar.appendChild(panelHost);

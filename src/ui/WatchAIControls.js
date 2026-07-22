@@ -23,13 +23,19 @@ export class WatchAIControls {
   /**
    * @param {HTMLElement} container
    * @param {{onRestart: (config: object) => void, onModeChange: (mode: string) => void,
-   *          onRunBenchmark: (config: object) => void}} handlers
+   *          onRunBenchmark: (config: object) => void, onToggleMusic: (enabled: boolean) => void}} handlers
    */
   constructor(container, handlers) {
     this.handlers = handlers;
     this.el = document.createElement('div');
     this.el.className = 'controls';
     container.appendChild(this.el);
+
+    // Globális, mód-független kapcsoló — minden scene ugyanazt a háttérzenét indítja (render/Audio.js).
+    this.musicToggle = document.createElement('input');
+    this.musicToggle.type = 'checkbox';
+    this.musicToggle.checked = true;
+    this.musicToggle.addEventListener('change', () => handlers.onToggleMusic(this.musicToggle.checked));
 
     this.modeSelect = this._select([
       { key: 'watch', label: 'Watch AI' },
@@ -128,6 +134,7 @@ export class WatchAIControls {
     this.restartField = restartButton;
 
     this.el.append(
+      field('Zene', this.musicToggle),
       field('Mód', this.modeSelect),
       this.algorithmField,
       this.weightField,
