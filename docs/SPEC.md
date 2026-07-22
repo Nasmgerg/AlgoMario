@@ -1,6 +1,4 @@
-# Webes platformjáték AI útkeresőkkel — Specifikáció
-
-> Kontextus: **saját side project**, cél a tanulás, a hat útkereső algoritmus összehasonlítása és egy publikálható portfólió-darab.
+# Webes platformjáték AI útkeresőkkel
 
 ---
 
@@ -18,13 +16,13 @@ A régi Java beadandó (`MarioGame` / `MarioState` / `Agent`) **logikai referenc
 |---|---|---|
 | D1 | Pályaméret | Konfigurálható. Alap: **16 sor × 250 oszlop**. Presetek: short 120 / normal 250 / long 500. |
 | D2 | Tick-limit | `maxTicks = length × 40`, alapértelmezésben **10 000**. |
-| D3 | Fizika | **Saját, fixed-timestep szimuláció.** Phaser Arcade Physics **nincs használva** — a delta-idő-függő fizika gépenként eltérő eredményt adna, ami a determinizmust, a race módot és a replay-t is elrontaná. |
+| D3 | Fizika | **Saját, fixed-timestep szimuláció.** Phaser Arcade Physics **nincs használva**: a delta-idő-függő fizika gépenként eltérő eredményt adna, ami a determinizmust, a race módot és a replay-t is elrontaná. |
 | D4 | Algoritmusok | Mind a hat marad. A Best-First **paraméterezhető keretrendszerként** kerül be (lásd 6.2). |
 | D5 | Keresési tér | Kétszintű: **jump-graph** (makró, itt fut a keresés) + **forward model** (mikró, végrehajtás). |
 | D6 | Élsúly | **Tick-szám (pozitív).** Két célmód: `speedrun` és `collector`. |
 | D7 | Mobil | **Kikerül** a követelmények közül. Reszponzív layout igen, touch-vezérlés nem. |
 | D8 | Determinizmus | Saját seedelt PRNG (mulberry32). `Math.random()` tilos. |
-| D9 | Keresés futtatása | **Generátor függvények** (`function*`), frame-enként időszeletelve — nem blokkolja a UI-t, lépésenként vizualizálható és bármikor leállítható. Worker csak batch-benchmarkhoz. |
+| D9 | Keresés futtatása | **Generátor függvények** (`function*`), frame-enként időszeletelve: nem blokkolja a UI-t, lépésenként vizualizálható és bármikor leállítható. Worker csak batch-benchmarkhoz. |
 | D10 | Metrikák | Memóriamérés helyett **peak open-list / closed méret / generált és kiterjesztett csomópontok**. |
 
 ---
@@ -75,7 +73,7 @@ export function step(state, action, level) { ... }
 ```
 
 Ez a projekt magja. **Phaser-független, Node alatt tesztelhető.** Ebből következik:
-- a replay = `{ seed, levelConfig, actions: Uint8Array }` — pár száz bájt;
+- a replay = `{ seed, levelConfig, actions: Uint8Array }`, pár száz bájt;
 - két gépen bit-pontosan ugyanaz az eredmény;
 - az AI és a játékos ugyanazt a fizikát kapja.
 
@@ -129,7 +127,7 @@ Paraméterek: `difficulty` (0–4), `length`, `gapFrequency`, `coinDensity`, `pl
 
 Az első 10 és az utolsó 5 oszlop mindig `flat` (biztonságos start és cél).
 
-### 4.3. Validátor — kötelező lépés
+### 4.3. Validátor: kötelező lépés
 
 Generálás után BFS a jump-graphon `start → goal`:
 
@@ -162,7 +160,7 @@ Tartomány: `dRow ∈ [-5, +8]`, `dCol ∈ [1, 7]` → ~100 bejegyzés. Futásid
 
 ### 5.3. JumpGraph (pályánként egyszer)
 
-- **Csomópont**: minden olyan cella, amin Mario állhat (talaj- vagy platformtető) → tipikusan 300–800 csomópont egy 250 oszlopos pályán, 500 oszlopnál is csak pár ezer — a keresés méretét ez nem korlátozza.
+- **Csomópont**: minden olyan cella, amin Mario állhat (talaj- vagy platformtető) → tipikusan 300–800 csomópont egy 250 oszlopos pályán, 500 oszlopnál is csak pár ezer. A keresés méretét ez nem korlátozza.
 - **Él**: `from → to`, ha a JumpTable szerint a mozgás végrehajtható **és** a röppálya nem ütközik semmibe (sugárkövetés a szimulált pozíciókon).
 - **Élsúly**: a mozgás tick-száma (pozitív egész).
 - **Él-metaadat**: az útvonalon érintett érmék listája.
@@ -181,7 +179,7 @@ Tartomány: `dRow ∈ [-5, +8]`, `dCol ∈ [1, 7]` → ~100 bejegyzés. Futásid
 
 | Mód | Probléma | Optimalitás |
 |---|---|---|
-| `speedrun` | egyetlen cél (a jobb szél), költség = tick | **A\* és Dijkstra bizonyíthatóan optimális** — ez a referencia-mérték, amihez a többit hasonlítjuk |
+| `speedrun` | egyetlen cél (a jobb szél), költség = tick | **A\* és Dijkstra bizonyíthatóan optimális**: ez a referencia-mérték, amihez a többit hasonlítjuk |
 | `collector` | waypoint-lánc: start → érme₁ → … → cél, a sorrendet nearest-neighbour heurisztika adja | Nem optimális, és ezt a UI-ban ki is írjuk |
 
 **Miért így:** ha az érme jutalma negatív élsúlyként kerülne a költségbe (`cost = tick − λ·reward`, ahogy a régi `Agent.java`-ban: `f = g + w·h − reward`), a Dijkstra és az A\* garanciái megszűnnének. Így viszont marad egy tiszta, mérhető viszonyítási pont.
@@ -194,7 +192,7 @@ h(n) = (goalCol − n.col) / MAX_RUN_SPEED
 
 Ez a hátralévő oszlopok minimális tick-költsége. **Megengedhető** (admissible), mert vízszintesen ennél gyorsabban semmi nem történhet, tehát az A\* optimalitása áll.
 
-Opcionális, kikapcsolható változat magassági taggal (`+ |rowDiff| × k`), ami már nem megengedhető, de gyorsabb — a UI-ban látszik a különbség. Ez önmagában is jó demó.
+Opcionális, kikapcsolható változat magassági taggal (`+ |rowDiff| × k`), ami már nem megengedhető, de gyorsabb. A UI-ban látszik a különbség. Ez önmagában is jó demó.
 
 ---
 
@@ -202,7 +200,7 @@ Opcionális, kikapcsolható változat magassági taggal (`+ |rowDiff| × k`), am
 
 ### 6.1. Közös váz
 
-Egyetlen keresőfüggvény, hat frontier-stratégia. Így a hat algoritmus összesen ~200 sor, és garantáltan ugyanazt a kódutat járják — az összehasonlítás fair.
+Egyetlen keresőfüggvény, hat frontier-stratégia. Így a hat algoritmus összesen ~200 sor, és garantáltan ugyanazt a kódutat járják. Emiatt fair az összehasonlítás.
 
 ```js
 /**
@@ -231,7 +229,7 @@ export function* search(problem, frontier, options) { ... }
 | **Greedy Best-First** | min-heap | `h` | Gyors, gyakran rossz utat ad |
 | **Best-First** | min-heap | `g + w·h` | **Paraméterezhető keretrendszer**, `w` csúszkával 0–10 |
 
-**A Best-First megkülönböztetése:** a Best-First a *keretrendszer* szerepét kapja, `w` súllyal — enélkül ugyanaz lenne, mint a Greedy Best-First:
+**A Best-First megkülönböztetése:** a Best-First a *keretrendszer* szerepét kapja, `w` súllyal. Enélkül ugyanaz lenne, mint a Greedy Best-First:
 
 - `w = 0` → Dijkstra
 - `w = 1` → A\*
@@ -278,8 +276,8 @@ Billentyűzet: `A`/`←` bal, `D`/`→` jobb, `W`/`↑`/`Space` ugrás, `R` rest
 
 ### 8.2. Watch AI
 Algoritmus + célmód + `w` súly kiválasztása. Két fázis:
-1. **Keresés** — a gráf és a bejárás élőben, rögzített ütemben vizualizálva
-2. **Végrehajtás** — a megtalált útvonal lejátszása
+1. **Keresés**: a gráf és a bejárás élőben, rögzített ütemben vizualizálva
+2. **Végrehajtás**: a megtalált útvonal lejátszása
 
 ### 8.3. Race Against AI
 
@@ -294,7 +292,7 @@ A `realtime` az érdekesebb: itt a gyenge algoritmusok láthatóan hibáznak, é
 
 ### 8.4. Benchmark
 
-N seed × 6 algoritmus, vizualizáció nélkül, Web Workerben. Eredmény: rendezhető táblázat + CSV export. **Ez lesz a portfólió legmeggyőzőbb eleme** — valódi mérési adat, nem állítás.
+N seed × 6 algoritmus, vizualizáció nélkül, Web Workerben. Eredmény: rendezhető táblázat + CSV export. **Ez lesz a portfólió legmeggyőzőbb eleme**: valódi mérési adat, nem állítás.
 
 ---
 
@@ -385,7 +383,7 @@ class Controller {
 }
 ```
 
-`HumanController`, `AIController`, `ReplayController` — mindhárom ugyanezt implementálja. Enélkül a race mód és a replay külön kódutak lennének.
+`HumanController`, `AIController`, `ReplayController`. Mindhárom ugyanezt implementálja. Enélkül a race mód és a replay külön kódutak lennének.
 
 ---
 
@@ -412,7 +410,7 @@ class Controller {
 | `algorithms.test.js` | mind a hat megoldást talál; A\* és Dijkstra költsége egyezik; A\* ≤ Greedy költség |
 | `golden.test.js` | `seed → pálya-hash` és `seed + algoritmus → útvonal-hash` |
 
-A `golden.test.js` fogja meg a nem szándékolt viselkedésváltozásokat — ez a determinizmus őre.
+A `golden.test.js` fogja meg a nem szándékolt viselkedésváltozásokat. Ez a determinizmus őre.
 
 ---
 
@@ -432,23 +430,23 @@ A `golden.test.js` fogja meg a nem szándékolt viselkedésváltozásokat — ez
 
 ## 13. Mérföldkövek
 
-### M1 — Mag (Phaser nélkül)
+### M1: Mag (Phaser nélkül)
 `Rng`, `step()`, `Level`, `LevelGenerator`, `LevelValidator`, tesztek.
-*Kész, ha:* egy seedből determinisztikusan, járhatóan legenerálódik a pálya, és a fizika tesztjei zöldek. Ekkor még nincs semmi a képernyőn — és ez így helyes.
+*Kész, ha:* egy seedből determinisztikusan, járhatóan legenerálódik a pálya, és a fizika tesztjei zöldek. Ekkor még nincs semmi a képernyőn, és ez így helyes.
 
-### M2 — Játszható
+### M2: Játszható
 Phaser scene, sprite-ok, kamera, input, HUD, Play Yourself, célba érés, halál, restart.
 
-### M3 — AI mag
+### M3: AI mag
 `JumpTable`, `JumpGraph`, `search()`, a hat algoritmus, `PlanExecutor`, Watch AI mód, alap statisztika.
 
-### M4 — Vizualizáció
+### M4: Vizualizáció
 Search overlay (open/closed/útvonal), sebesség-csúszka, `w` súly csúszka, debug nézet.
 
-### M5 — Verseny és mérés
+### M5: Verseny és mérés
 Race (mindkét almód), Benchmark mód, összehasonlító táblázat, CSV export.
 
-### M6 — Publikálás
+### M6: Publikálás
 README mérési eredményekkel, `docs/ALGORITHMS.md`, GitHub Actions deploy, GIF-ek.
 
 ---
@@ -471,6 +469,6 @@ README mérési eredményekkel, `docs/ALGORITHMS.md`, GitHub Actions deploy, GIF
 
 Nem részei a jelenlegi specifikációnak, de a jövőben megfontolandók:
 
-1. **Változó ugrásmagasság** — jobb game feel, de +1 akció a keresésben, ami minden algoritmust és a `JumpTable`-t is érintené.
-2. **Ellenfelek (Goomba-szerű)** — dinamikus akadály, ami időfüggővé teszi a keresést. Ez már egy másik projekt (időbővített állapottér), de érdekes bővítés.
-3. **Napi challenge** — a dátumból származtatott seed, eredmény `localStorage`-ben. Olcsó és jól mutat.
+1. **Változó ugrásmagasság**: jobb game feel, de +1 akció a keresésben, ami minden algoritmust és a `JumpTable`-t is érintené.
+2. **Ellenfelek (Goomba-szerű)**: dinamikus akadály, ami időfüggővé teszi a keresést. Ez már egy másik projekt (időbővített állapottér), de érdekes bővítés.
+3. **Napi challenge**: a dátumból származtatott seed, eredmény `localStorage`-ben. Olcsó és jól mutat.
