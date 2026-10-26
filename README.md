@@ -12,7 +12,7 @@ projektismertetővel és egy "Tovább a játékhoz" gombbal, ami a tényleges
 alkalmazásra vált.
 
 <!-- TODO: élő demó link ide, miután a GitHub Pages be van kapcsolva, pl.
-**Élő demó:** https://<felhasznalonev>.github.io/<repo>/ -->
+**Élő demó:** [https://<felhasznalonev>.github.io/<repo>/](https://nasmgerg.github.io/AlgoMario/) -->
 
 ## Képernyőképek
 
